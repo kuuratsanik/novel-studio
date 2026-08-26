@@ -1,0 +1,167 @@
+{
+  "name": "novel-studio",
+  "displayName": "Novel Studio",
+  "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
+  "version": "1.0.0",
+  "publisher": "kuuratsanik",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1c1612",
+    "theme": "dark"
+  },
+  "keywords": ["novel", "writing", "fiction", "markdown", "ai", "ollama", "novelai"],
+  "homepage": "https://github.com/kuuratsanik/novel-studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuuratsanik/novel-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kuuratsanik/novel-studio/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "Education"],
+  "activationEvents": ["onView:novelStudio.sidebar", "onLanguage:markdown"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "novelStudio",
+          "title": "Novel Studio",
+          "icon": "resources/book.svg"
+        }
+      ]
+    },
+    "views": {
+      "novelStudio": [
+        {
+          "type": "webview",
+          "id": "novelStudio.sidebar",
+          "name": "Studio Hub"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Novel Studio",
+      "properties": {
+        "novelStudio.offlineFirst": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prefer Ollama or other local engines."
+        },
+        "novelStudio.defaultProvider": {
+          "type": "string",
+          "default": "auto",
+          "description": "Force a text provider or leave auto."
+        },
+        "novelStudio.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model id when a provider is forced."
+        },
+        "novelStudio.localTextUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "Local OpenAI-compatible text endpoint."
+        },
+        "novelStudio.privacyLocalCodex": {
+          "type": "boolean",
+          "default": false,
+          "description": "Do not send series bible or RAG context to cloud providers."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "novelStudio.continueScene",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "novelStudio.auditContinuity",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "novelStudio.diffRewrite",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "novelStudio.snapshot",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s",
+        "when": "editorTextFocus"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "novelStudio.start",
+        "title": "Novel Studio",
+        "description": "Bootstrap a novel folder and write with contracts and state.",
+        "steps": [
+          {
+            "id": "boot",
+            "title": "Create the workspace layout",
+            "description": "Run Novel Studio: New Novel Workspace from the Command Palette.",
+            "media": {
+              "markdown": "media/walkthrough.md"
+            }
+          }
+        ]
+      }
+    ],
+    "commands": [
+      { "command": "novelStudio.setKey", "title": "Novel Studio: Set API Key" },
+      { "command": "novelStudio.setNovelAiKey", "title": "Novel Studio: Set NovelAI API Token" },
+      { "command": "novelStudio.setOpenRouterKey", "title": "Novel Studio: Set OpenRouter API Key" },
+      { "command": "novelStudio.continueScene", "title": "Novel Studio: Continue Scene" },
+      { "command": "novelStudio.expandSelection", "title": "Novel Studio: Expand Selection" },
+      { "command": "novelStudio.diffRewrite", "title": "Novel Studio: Diff Rewrite Selection" },
+      { "command": "novelStudio.multiAgent", "title": "Novel Studio: Multi-Agent Pass" },
+      { "command": "novelStudio.auditContinuity", "title": "Novel Studio: Audit Continuity" },
+      { "command": "novelStudio.compileManuscript", "title": "Novel Studio: Compile Manuscript" },
+      { "command": "novelStudio.exportLora", "title": "Novel Studio: Export LoRA JSONL" },
+      { "command": "novelStudio.audiobookBatch", "title": "Novel Studio: Audiobook Batch" },
+      { "command": "novelStudio.runPrompt", "title": "Novel Studio: Run Prompt Library" },
+      { "command": "novelStudio.seedWorkspace", "title": "Novel Studio: Seed Prompts + studio.json" },
+      { "command": "novelStudio.polishSelection", "title": "Novel Studio: Polish Selection" },
+      { "command": "novelStudio.narrateChapter", "title": "Novel Studio: Narrate Chapter" },
+      { "command": "novelStudio.revisionMode", "title": "Novel Studio: Revision Mode" },
+      { "command": "novelStudio.seedState", "title": "Novel Studio: Seed Series State" },
+      { "command": "novelStudio.seedContract", "title": "Novel Studio: Seed Scene Contract" },
+      { "command": "novelStudio.buildVoices", "title": "Novel Studio: Build Voice Models" },
+      { "command": "novelStudio.outlineSync", "title": "Novel Studio: Outline Sync" },
+      { "command": "novelStudio.analytics", "title": "Novel Studio: Analytics Dashboard" },
+      { "command": "novelStudio.snapshot", "title": "Novel Studio: Snapshot Branch" },
+      { "command": "novelStudio.mergeBranch", "title": "Novel Studio: Merge Branch" },
+      { "command": "novelStudio.clipResearch", "title": "Novel Studio: Clip Research" },
+      { "command": "novelStudio.publishPackage", "title": "Novel Studio: Publish Package" },
+      { "command": "novelStudio.addComment", "title": "Novel Studio: Add Comment" },
+      { "command": "novelStudio.evalHarness", "title": "Novel Studio: Eval Harness" },
+      { "command": "novelStudio.readAloudQa", "title": "Novel Studio: Read-Aloud QA" },
+      { "command": "novelStudio.bootstrap", "title": "Novel Studio: New Novel Workspace" },
+      { "command": "novelStudio.importDocx", "title": "Novel Studio: Import Word Document" },
+      { "command": "novelStudio.archiveProject", "title": "Novel Studio: Archive Project" },
+      { "command": "novelStudio.applyStatePatch", "title": "Novel Studio: Propose State Patches" },
+      { "command": "novelStudio.runUnitTests", "title": "Novel Studio: Run Unit Tests" }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.5.0"
+  }
+}

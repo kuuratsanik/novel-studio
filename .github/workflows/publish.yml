@@ -1,0 +1,15 @@
+name: Publish
+on:
+  release:
+    types: [published]
+jobs:
+  vsce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run compile
+      - run: npx @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
