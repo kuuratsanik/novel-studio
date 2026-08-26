@@ -1,26 +1,41 @@
 # Novel Studio
 
-A writing operating system inside Visual Studio Code. Draft in Markdown, keep canon in `codex/`, generate and revise with the engine you already pay for, then compile a manuscript.
+Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, manuscript compile.
 
-## Get started
+**Publisher ID:** `kuuratsanik`  
+**Extension ID:** `kuuratsanik.novel-studio`  
+**Repo:** https://github.com/kuuratsanik/novel-studio
 
-1. Open an empty folder (or an existing novel repo).
-2. Command Palette → **Novel Studio: New Novel Workspace**.
-3. Open `drafts/ch01.md`. Fill `drafts/contracts/ch01.json`.
-4. **Novel Studio: Continue Scene** (`Ctrl+Alt+N`).
-5. Optional: Activity Bar → Novel Studio → **Keys** to store tokens in VS Code SecretStorage.
+## Status of this repository
 
-A Get Started walkthrough also appears after install.
+Packaging, docs, and core TypeScript entrypoints are on `main`.  
+The complete `src/` tree is also shipped in the project zip (`novel-studio-1.0.0-full.zip`). If any service file is missing after clone, unpack the zip over this folder.
 
-## Settings
+## Local install (no Marketplace needed)
 
-- `novelStudio.offlineFirst` — prefer local Ollama
-- `novelStudio.defaultProvider` / `defaultModel` / `localTextUrl`
-- `novelStudio.privacyLocalCodex` — do not send bible/RAG to cloud models
+```bash
+git clone https://github.com/kuuratsanik/novel-studio.git
+cd novel-studio
+# if src/ is incomplete, copy from the full zip
+npm install
+npm run compile
+npx @vscode/vsce package
+code --install-extension kuuratsanik-novel-studio-1.0.0.vsix
+```
 
-## Publish
+## Marketplace publish
 
-See [PUBLISH.md](PUBLISH.md). Publisher id: `kuuratsanik`.
+1. Create publisher `kuuratsanik` at https://marketplace.visualstudio.com/manage  
+   (website field can be `https://github.com/kuuratsanik`)
+2. Azure DevOps PAT with Marketplace **Publish**
+3. Then:
+
+```bash
+npx @vscode/vsce login kuuratsanik
+npx @vscode/vsce publish
+```
+
+See [PUBLISH.md](PUBLISH.md).
 
 ## License
 
