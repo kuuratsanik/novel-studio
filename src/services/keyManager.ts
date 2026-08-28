@@ -36,6 +36,12 @@ export class KeyManager {
     return !!(await this.getKey(service));
   }
 
+  async requireKey(service: string, message: string): Promise<string> {
+    const k = await this.getKey(service);
+    if (!k) throw new Error(message);
+    return k;
+  }
+
   async deleteKey(service: string): Promise<void> {
     await this.secrets.delete(this.keyName(service));
   }
