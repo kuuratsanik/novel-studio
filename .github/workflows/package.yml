@@ -1,0 +1,20 @@
+name: Package
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  vsix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run compile
+      - run: npx @vscode/vsce package --allow-missing-repository
+      - uses: actions/upload-artifact@v4
+        with:
+          name: novel-studio-vsix
+          path: "*.vsix"
