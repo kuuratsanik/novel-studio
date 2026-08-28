@@ -13,6 +13,16 @@ jobs:
           node-version: "20"
       - run: npm install
       - run: npm run compile
+      - name: Decode marketplace icon
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          raw = Path("resources/icon.png.b64").read_text().strip()
+          Path("resources").mkdir(exist_ok=True)
+          Path("resources/icon.png").write_bytes(base64.b64decode(raw))
+          print("wrote", Path("resources/icon.png").stat().st_size, "bytes")
+          PY
       - run: npx @vscode/vsce package --allow-missing-repository
       - uses: actions/upload-artifact@v4
         with:
