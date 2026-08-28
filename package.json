@@ -5,7 +5,6 @@
   "version": "1.0.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
-  "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#1c1612",
     "theme": "dark"
