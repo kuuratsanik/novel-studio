@@ -11,6 +11,7 @@ import { StudioStatusBar } from "./services/statusBar";
 import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./services/automation";
 import { WikiLinkCompletionProvider, WikiLinkHoverProvider } from "./services/wikiProviders";
 import { scheduleEmbeddingRebuild } from "./services/embeddingScheduler";
+import { invalidateMarkdownCache } from "./services/workspaceIo";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,6 +77,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.multiAgent", wrap(() => cmds.multiAgent(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.auditContinuity", wrap(() => cmds.runAudit(diagnostics))),
     vscode.commands.registerCommand("novelStudio.compileManuscript", wrap(() => cmds.compileAll())),
+    vscode.commands.registerCommand("novelStudio.exportHtml", wrap(() => cmds.exportHtmlCmd())),
     vscode.commands.registerCommand("novelStudio.exportLora", wrap(() => cmds.exportLora())),
     vscode.commands.registerCommand("novelStudio.audiobookBatch", wrap(() => cmds.batchAudiobook(audio))),
     vscode.commands.registerCommand("novelStudio.runPrompt", wrap(() => cmds.pickPromptAndRun(text, keyManager))),
@@ -110,15 +112,20 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.archiveProject", wrap(() => cmds.archiveCmd())),
     vscode.commands.registerCommand("novelStudio.applyStatePatch", wrap(() => cmds.applyStateFromSelection())),
     vscode.commands.registerCommand("novelStudio.runUnitTests", wrap(() => cmds.runTestsCmd())),
-    vscode.window.onDidChangeActiveTextEditor(() => void status.refresh()),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      void status.refresh();
+      provider.refreshOnEditorChange();
+    }),
     vscode.workspace.onDidChangeTextDocument((e) => {
       void status.refresh();
       if (e.document.languageId === "markdown") auditIfAutomatic();
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.languageId === "markdown") {
+        invalidateMarkdownCache();
         void auditIfAutomatic();
         scheduleEmbeddingRebuild(doc);
+        provider.refreshOnEditorChange();
       }
     }),
   );

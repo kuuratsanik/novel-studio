@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import { listMarkdown, readWorkspaceFile, workspaceRoot, writeWorkspaceFile } from "./workspaceIo";
 import { draftSortKey } from "./frontmatter";
 import { epubCss, EpubTheme } from "./epubThemes";
+import { loadStudioConfig } from "./studioConfig";
+import { markdownToXhtml, wikiTitleSet } from "./markdownHtml";
 
 const execFileAsync = promisify(execFile);
 
@@ -16,23 +18,6 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function mdToXhtml(md: string, title: string): string {
-  const body = md
-    .replace(/^---[\s\S]*?---\n/, "")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .split(/\n{2,}/)
-    .map((p) => {
-      const t = p.trim();
-      if (!t) return "";
-      if (t.startsWith("<h")) return t;
-      return `<p>${esc(t).replace(/\n/g, "<br/>")}</p>`;
-    })
-    .join("\n");
-  return `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${esc(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>\n${body}\n</body></html>`;
-}
-
 export async function exportEpub(title = "Manuscript"): Promise<string> {
   const drafts = (await listMarkdown())
     .filter((f) => f.rel.startsWith("drafts/") && !f.rel.includes("/contracts/"))
@@ -40,13 +25,9 @@ export async function exportEpub(title = "Manuscript"): Promise<string> {
 
   if (!drafts.length) throw new Error("No draft chapters to export.");
 
-  let bookTitle = title;
-  try {
-    const studio = JSON.parse(await readWorkspaceFile("studio.json")) as { title?: string };
-    if (studio.title) bookTitle = studio.title;
-  } catch {
-    // default title
-  }
+  const studio = await loadStudioConfig();
+  const bookTitle = studio.title || title;
+  const wiki = await wikiTitleSet();
 
   const base = "compile/epub-build";
   await writeWorkspaceFile(`${base}/mimetype`, "application/epub+zip");
@@ -64,7 +45,7 @@ export async function exportEpub(title = "Manuscript"): Promise<string> {
   for (let i = 0; i < drafts.length; i++) {
     const id = `ch${i + 1}`;
     const name = drafts[i].rel.replace(/^drafts\//, "").replace(/\.md$/, "");
-    const xhtml = mdToXhtml(drafts[i].text, name);
+    const xhtml = markdownToXhtml(drafts[i].text, name, wiki);
     await writeWorkspaceFile(`${base}/OEBPS/${id}.xhtml`, xhtml);
     items.push(`<item id="${id}" href="${id}.xhtml" media-type="application/xhtml+xml"/>`);
     spine.push(`<itemref idref="${id}"/>`);

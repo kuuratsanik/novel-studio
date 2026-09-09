@@ -1,6 +1,8 @@
-import { listMarkdown, writeWorkspaceFile, readWorkspaceFile } from "./workspaceIo";
+import { listMarkdown, writeWorkspaceFile } from "./workspaceIo";
 import { dialogueRatio, wordCount } from "./proseStats";
 import { loadContract, contractReady } from "./contracts";
+import { draftSortKey } from "./frontmatter";
+import { loadStudioConfig } from "./studioConfig";
 
 export interface AnalyticsSnapshot {
   totalWords: number;
@@ -17,13 +19,8 @@ export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
   const drafts = files.filter((f) => f.rel.startsWith("drafts/") && !f.rel.includes("/contracts/"));
   const totalWords = drafts.reduce((n, f) => n + wordCount(f.text), 0);
 
-  let target = 80000;
-  try {
-    const studio = JSON.parse(await readWorkspaceFile("studio.json")) as { wordTarget?: number };
-    if (studio.wordTarget) target = studio.wordTarget;
-  } catch {
-    // default
-  }
+  const studio = await loadStudioConfig();
+  const target = studio.wordTarget || 80000;
 
   let contractsReady = 0;
   for (const d of drafts) {
@@ -32,7 +29,7 @@ export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
   }
 
   const chapters = drafts
-    .sort((a, b) => a.rel.localeCompare(b.rel))
+    .sort((a, b) => draftSortKey(a.rel, a.text) - draftSortKey(b.rel, b.text))
     .map((f) => ({
       rel: f.rel,
       words: wordCount(f.text),

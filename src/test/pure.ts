@@ -4,6 +4,8 @@ import { auditContract } from "../services/contractAudit";
 import { cosineSimilarity, filterWordHits, overlapScore, wordCount } from "../services/proseStats";
 import { draftSortKey, parseFrontmatter } from "../services/frontmatter";
 import { epubCss } from "../services/epubThemes";
+import { markdownToHtmlBlocks } from "../services/markdownHtml";
+import { voicePromptForSpeakers } from "../services/characterVoice";
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -37,6 +39,14 @@ export function runPureTests(): void {
   assert(cosineSimilarity([1, 0], [1, 0]) === 1, "cosine identical");
   assert(epubCss("serif").includes("Georgia"), "epub serif theme");
   assert(epubCss("dark").includes("#121212"), "epub dark theme");
+
+  const html = markdownToHtmlBlocks("## Title\n\n**bold** and *italic* with [[Hero|the hero]].", new Set(["hero"]));
+  assert(html.includes("<strong>bold</strong>"), "md bold");
+  assert(html.includes("<em>italic</em>"), "md italic");
+  assert(html.includes("wiki-link"), "wiki span");
+
+  const voice = voicePromptForSpeakers(["Rowan"], [{ name: "Rowan", lines: 5, avgLen: 12, top: ["aye"], sample: "hi" }]);
+  assert(voice.includes("Rowan"), "voice prompt");
 }
 
 if (require.main === module) {

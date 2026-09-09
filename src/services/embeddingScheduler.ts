@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
-import { rebuildEmbeddings } from "./embeddings";
+import { rebuildEmbeddingsForPaths } from "./embeddings";
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running = false;
+let pendingPaths: string[] = [];
 
 function shouldIndex(rel: string): boolean {
   return rel.startsWith("codex/") || rel.startsWith("drafts/") || rel.startsWith("research/");
@@ -16,15 +17,23 @@ export function scheduleEmbeddingRebuild(document: vscode.TextDocument): void {
   const rel = vscode.workspace.asRelativePath(document.uri).replace(/\\/g, "/");
   if (!shouldIndex(rel) || !rel.endsWith(".md")) return;
 
+  pendingPaths.push(rel);
   if (timer) clearTimeout(timer);
-  timer = setTimeout(() => void runRebuild(cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434"), 8000);
+  timer = setTimeout(() => {
+    const paths = [...new Set(pendingPaths)];
+    pendingPaths = [];
+    void runRebuild(paths, cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434");
+  }, 8000);
 }
 
-async function runRebuild(localUrl: string): Promise<void> {
-  if (running) return;
+async function runRebuild(paths: string[], localUrl: string): Promise<void> {
+  if (running) {
+    pendingPaths.push(...paths);
+    return;
+  }
   running = true;
   try {
-    const n = await rebuildEmbeddings(localUrl);
+    const n = await rebuildEmbeddingsForPaths(paths, localUrl);
     if (n > 0) {
       vscode.window.setStatusBarMessage(`Novel Studio: refreshed ${n} embedding chunk(s)`, 4000);
     }
@@ -32,5 +41,10 @@ async function runRebuild(localUrl: string): Promise<void> {
     // Ollama may be offline
   } finally {
     running = false;
+    if (pendingPaths.length) {
+      const next = [...new Set(pendingPaths)];
+      pendingPaths = [];
+      void runRebuild(next, localUrl);
+    }
   }
 }

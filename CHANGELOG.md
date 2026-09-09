@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.5.0
+
+- Studio Hub **Workflow** tab: compile, HTML, EPUB, publish zip, outline sync, embeddings, snapshot, audit.
+- Sidebar streams generation into the output panel; contract gate before story generation.
+- Editor sync: contract and analytics refresh when you switch chapters.
+- Clickable chapter rows in Analytics open the draft file.
+- Model/provider footer with **Pick local model** in Studio Hub.
+- Markdown index cache (invalidated on save) for faster audits and RAG.
+- Incremental embedding rebuild on save (only changed files).
+- Cross-chapter continuity audit, POV/tense/banned-word checks from `studio.json`.
+- Character voice models injected into generation context.
+- Richer EPUB/HTML: bold, italic, lists, `[[wiki]]` links.
+- Real publish/KDP zip with manuscript.md, manuscript.html, manifest.
+- **Export HTML Manuscript** command (`compile/manuscript.html`).
+
 ## 1.4.0
 
 - Studio Hub **Analytics** tab with live word counts, progress bar, and per-chapter stats.

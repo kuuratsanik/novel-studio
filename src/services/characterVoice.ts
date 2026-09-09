@@ -1,4 +1,4 @@
-import { listMarkdown, writeWorkspaceFile } from "./workspaceIo";
+import { listMarkdown, readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
 
 export interface VoiceModel {
   name: string;
@@ -35,4 +35,23 @@ export async function buildVoiceModels(): Promise<VoiceModel[]> {
   }
   await writeWorkspaceFile("codex/voice-models.json", JSON.stringify(models, null, 2) + "\n");
   return models;
+}
+
+export async function loadVoiceModels(): Promise<VoiceModel[]> {
+  try {
+    return JSON.parse(await readWorkspaceFile("codex/voice-models.json")) as VoiceModel[];
+  } catch {
+    return [];
+  }
+}
+
+export function voicePromptForSpeakers(speakers: string[], models: VoiceModel[]): string {
+  const wanted = speakers.map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!wanted.length) return "";
+  const hits = models.filter((m) => wanted.some((w) => m.name.toLowerCase().includes(w) || w.includes(m.name.toLowerCase())));
+  if (!hits.length) return "";
+  const lines = hits.map(
+    (m) => `${m.name}: avg line ${m.avgLen.toFixed(0)} words; markers: ${m.top.join(", ")}; sample: ${m.sample}`,
+  );
+  return `Character voice models:\n${lines.join("\n")}`;
 }

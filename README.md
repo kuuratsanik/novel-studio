@@ -36,6 +36,8 @@ v1.3 adds a **Contract** tab in Studio Hub, semantic embedding RAG (`ollama pull
 
 v1.4 adds an **Analytics** tab (live word counts, progress, per-chapter stats), auto-rebuild embeddings on save (`novelStudio.autoRebuildEmbeddings`), and EPUB themes (`novelStudio.epubTheme`: serif, sans, dark).
 
+v1.5 adds a **Workflow** tab (compile, HTML, EPUB, KDP zip), sidebar streaming, contract gate, cross-chapter continuity audit, voice-model context, incremental embeddings, and clickable chapters in Analytics.
+
 ## Routing
 
 | Tool | Destination |

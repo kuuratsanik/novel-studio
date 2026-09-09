@@ -1,6 +1,12 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
+let markdownCache: { root: string; files: { rel: string; text: string }[] } | null = null;
+
+export function invalidateMarkdownCache(): void {
+  markdownCache = null;
+}
+
 export function workspaceRoot(): string {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
@@ -18,6 +24,7 @@ export async function writeWorkspaceFile(rel: string, content: string | Buffer):
   await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(uri.fsPath)));
   const data = typeof content === "string" ? Buffer.from(content, "utf8") : content;
   await vscode.workspace.fs.writeFile(uri, data);
+  invalidateMarkdownCache();
   return rel;
 }
 
@@ -28,6 +35,10 @@ export async function readWorkspaceFile(rel: string): Promise<string> {
 
 export async function listMarkdown(): Promise<{ rel: string; text: string }[]> {
   const root = workspaceRoot();
+  if (markdownCache?.root === root) {
+    return markdownCache.files;
+  }
+
   const out: { rel: string; text: string }[] = [];
   async function walk(dir: string, prefix: string) {
     let entries: [string, vscode.FileType][];
@@ -50,5 +61,6 @@ export async function listMarkdown(): Promise<{ rel: string; text: string }[]> {
     }
   }
   await walk(root, "");
+  markdownCache = { root, files: out };
   return out;
 }

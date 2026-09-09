@@ -44,26 +44,22 @@ async function embedOllama(text: string, localUrl: string, model: string): Promi
   return data.embedding;
 }
 
-export async function rebuildEmbeddings(localUrl = "http://127.0.0.1:11434"): Promise<number> {
-  const model =
-    vscode.workspace.getConfiguration("novelStudio").get<string>("embeddingModel") || DEFAULT_MODEL;
-  const files = (await listMarkdown()).filter(
-    (f) => f.rel.startsWith("codex/") || f.rel.startsWith("drafts/") || f.rel.startsWith("research/"),
-  );
+async function embedChunks(
+  rel: string,
+  text: string,
+  localUrl: string,
+  model: string,
+): Promise<EmbeddingChunk[]> {
   const chunks: EmbeddingChunk[] = [];
-  for (const file of files) {
-    for (const c of chunkText(file.rel, file.text)) {
-      try {
-        const vector = await embedOllama(c.text, localUrl, model);
-        chunks.push({ ...c, vector });
-      } catch {
-        // skip chunks when embedding endpoint unavailable
-      }
+  for (const c of chunkText(rel, text)) {
+    try {
+      const vector = await embedOllama(c.text, localUrl, model);
+      chunks.push({ ...c, vector });
+    } catch {
+      // skip when embedding endpoint unavailable
     }
   }
-  const store: EmbeddingStore = { model, updated: new Date().toISOString(), chunks };
-  await writeWorkspaceFile(STORE_PATH, JSON.stringify(store));
-  return chunks.length;
+  return chunks;
 }
 
 async function loadStore(): Promise<EmbeddingStore | undefined> {
@@ -72,6 +68,41 @@ async function loadStore(): Promise<EmbeddingStore | undefined> {
   } catch {
     return undefined;
   }
+}
+
+async function saveStore(store: EmbeddingStore): Promise<void> {
+  store.updated = new Date().toISOString();
+  await writeWorkspaceFile(STORE_PATH, JSON.stringify(store));
+}
+
+export async function rebuildEmbeddingsForPaths(
+  paths: string[],
+  localUrl = "http://127.0.0.1:11434",
+): Promise<number> {
+  const model =
+    vscode.workspace.getConfiguration("novelStudio").get<string>("embeddingModel") || DEFAULT_MODEL;
+  const unique = [...new Set(paths.filter((p) => p.endsWith(".md")))];
+  if (!unique.length) return 0;
+
+  const files = (await listMarkdown()).filter((f) => unique.includes(f.rel));
+  const existing = (await loadStore()) || { model, updated: "", chunks: [] };
+  const keep = existing.chunks.filter((c) => !unique.includes(c.path));
+  const fresh: EmbeddingChunk[] = [];
+
+  for (const file of files) {
+    fresh.push(...(await embedChunks(file.rel, file.text, localUrl, model)));
+  }
+
+  const store: EmbeddingStore = { model, updated: "", chunks: [...keep, ...fresh] };
+  await saveStore(store);
+  return fresh.length;
+}
+
+export async function rebuildEmbeddings(localUrl = "http://127.0.0.1:11434"): Promise<number> {
+  const files = (await listMarkdown()).filter(
+    (f) => f.rel.startsWith("codex/") || f.rel.startsWith("drafts/") || f.rel.startsWith("research/"),
+  );
+  return rebuildEmbeddingsForPaths(files.map((f) => f.rel), localUrl);
 }
 
 export async function retrieveEmbeddingContext(

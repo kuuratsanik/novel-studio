@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -130,7 +130,17 @@
           "type": "string",
           "default": "serif",
           "enum": ["serif", "sans", "dark"],
-          "description": "Typography theme for EPUB export."
+          "description": "Typography theme for EPUB and HTML export."
+        },
+        "novelStudio.crossChapterAudit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cross-check earlier chapters and codex during continuity audit."
+        },
+        "novelStudio.contractGate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require a complete scene contract before story generation in Studio Hub."
         }
       }
     },
@@ -187,6 +197,7 @@
       { "command": "novelStudio.multiAgent", "title": "Novel Studio: Multi-Agent Pass" },
       { "command": "novelStudio.auditContinuity", "title": "Novel Studio: Audit Continuity" },
       { "command": "novelStudio.compileManuscript", "title": "Novel Studio: Compile Manuscript" },
+      { "command": "novelStudio.exportHtml", "title": "Novel Studio: Export HTML Manuscript" },
       { "command": "novelStudio.exportLora", "title": "Novel Studio: Export LoRA JSONL" },
       { "command": "novelStudio.audiobookBatch", "title": "Novel Studio: Audiobook Batch" },
       { "command": "novelStudio.runPrompt", "title": "Novel Studio: Run Prompt Library" },

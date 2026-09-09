@@ -8,6 +8,8 @@ import { automationSettings } from "./services/automation";
 import { contractReady, currentDraftRel, loadContract, saveContract, SceneContract } from "./services/contracts";
 import { ensureSceneContract } from "./services/autoContract";
 import { getAnalyticsSnapshot } from "./services/analytics";
+import { pickRoute } from "./commands";
+import { uriFor } from "./services/workspaceIo";
 
 export interface StudioHubDeps {
   keys: KeyManager;
@@ -36,18 +38,29 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this._getHtmlForWebview();
     void this._sendContract();
+    void this._sendRoute();
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       try {
         switch (data.type) {
           case "generate": {
             this._post({ type: "status", busy: true, message: "Generating…" });
+            let streamBuf = "";
+            const streamOn = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
+            const onToken = streamOn
+              ? (chunk: string) => {
+                  streamBuf += chunk;
+                  this._post({ type: "stream", text: streamBuf });
+                }
+              : undefined;
             const result = await generateFromTool(
               this._deps.text,
               this._deps.keys,
               data.tool as StudioTool,
               data.fields || {},
               this._deps.diagnostics,
+              onToken,
+              !!data.force,
             );
             this._post({
               type: "generated",
@@ -56,6 +69,40 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
               busy: false,
               message: `Routed to ${result.route}`,
             });
+            break;
+          }
+          case "loadRoute": {
+            await this._sendRoute();
+            break;
+          }
+          case "pickModel": {
+            await vscode.commands.executeCommand("novelStudio.pickModel");
+            await this._sendRoute();
+            break;
+          }
+          case "workflow": {
+            this._post({ type: "status", busy: true, message: `Running ${data.action}…` });
+            const map: Record<string, string> = {
+              compile: "novelStudio.compileManuscript",
+              html: "novelStudio.exportHtml",
+              epub: "novelStudio.exportEpub",
+              outline: "novelStudio.outlineSync",
+              embeddings: "novelStudio.rebuildEmbeddings",
+              snapshot: "novelStudio.compareSnapshot",
+              publish: "novelStudio.publishPackage",
+              audit: "novelStudio.auditContinuity",
+            };
+            const cmd = map[String(data.action)];
+            if (!cmd) throw new Error(`Unknown workflow action: ${data.action}`);
+            await vscode.commands.executeCommand(cmd);
+            this._post({ type: "status", busy: false, message: `Done: ${data.action}` });
+            break;
+          }
+          case "openChapter": {
+            const rel = String(data.rel || "");
+            if (!rel) return;
+            const doc = await vscode.workspace.openTextDocument(uriFor(rel));
+            await vscode.window.showTextDocument(doc);
             break;
           }
           case "routeOutput": {
@@ -122,14 +169,32 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        if (message.toLowerCase().includes("contract incomplete")) {
+          this._post({ type: "contractGate", message, busy: false });
+          return;
+        }
         this._post({ type: "status", busy: false, message, error: true });
         vscode.window.showErrorMessage(message);
       }
     });
   }
 
+  public refreshOnEditorChange(): void {
+    void this._sendContract();
+    void this._sendAnalytics();
+  }
+
   private _post(payload: Record<string, unknown>) {
     this._view?.webview.postMessage(payload);
+  }
+
+  private async _sendRoute() {
+    try {
+      const route = await pickRoute(this._deps.keys);
+      this._post({ type: "routeLoaded", provider: route.provider, model: route.model });
+    } catch {
+      this._post({ type: "routeLoaded", provider: "—", model: "—" });
+    }
   }
 
   private async _sendAnalytics() {
@@ -208,9 +273,15 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     #status { font-size: 11px; min-height: 1.2em; margin: 6px 0; color: var(--vscode-descriptionForeground); }
     #status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
-    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-    .tab { flex: 1; padding: 6px; border: 1px solid var(--vscode-panel-border); background: var(--vscode-button-secondaryBackground); cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .tab { flex: 1 1 45%; padding: 6px; border: 1px solid var(--vscode-panel-border); background: var(--vscode-button-secondaryBackground); cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
     .tab.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    .hub-footer { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); font-size: 11px; color: var(--vscode-descriptionForeground); }
+    .workflow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .workflow-grid button { margin-top: 0; font-size: 11px; padding: 6px; }
+    #chapterList div { padding: 3px 0; cursor: pointer; }
+    #chapterList div:hover { color: var(--vscode-textLink-foreground); }
+    #contractGate { display: none; margin: 8px 0; padding: 8px; border: 1px solid var(--vscode-inputValidation-warningBorder); background: var(--vscode-inputValidation-warningBackground); font-size: 11px; }
     .hub-section { display: none; }
     .hub-section.active { display: block; }
     #contractReady { font-size: 11px; margin-bottom: 6px; }
@@ -227,6 +298,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button class="tab active" data-tab="tools">Tools</button>
     <button class="tab" data-tab="contract">Contract</button>
     <button class="tab" data-tab="analytics">Analytics</button>
+    <button class="tab" data-tab="workflow">Workflow</button>
   </div>
 
   <section id="section-tools" class="hub-section active">
@@ -296,6 +368,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <input id="pt_constraint" />
   </div>
 
+  <div id="contractGate"><span id="gateMsg"></span><button class="btn-secondary" id="btnForceGenerate" style="margin-top:6px">Generate anyway</button></div>
   <button id="btnGenerate">Generate & Route Automatically</button>
   <div id="status"></div>
 
@@ -330,6 +403,25 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button id="btnRefreshAnalytics" class="btn-secondary">Write compile/analytics.md</button>
   </section>
 
+  <section id="section-workflow" class="hub-section">
+    <p class="hint">One-click manuscript pipeline from the sidebar.</p>
+    <div class="workflow-grid">
+      <button data-action="compile">Compile manuscript</button>
+      <button data-action="html">Export HTML</button>
+      <button data-action="epub">Export EPUB</button>
+      <button data-action="publish">Publish / KDP zip</button>
+      <button data-action="outline">Outline sync</button>
+      <button data-action="embeddings">Rebuild embeddings</button>
+      <button data-action="snapshot">Compare snapshot</button>
+      <button data-action="audit">Continuity audit</button>
+    </div>
+  </section>
+
+  <div class="hub-footer">
+    <div>Model: <strong id="hubModel">—</strong></div>
+    <button class="btn-secondary" id="btnPickModel" style="margin-top:6px">Pick local model</button>
+  </div>
+
   <script>
     const vscode = acquireVsCodeApi();
     const selector = document.getElementById('toolSelector');
@@ -353,9 +445,12 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       document.getElementById('panel-' + selector.value).classList.add('active');
     });
 
-    btnGenerate.addEventListener('click', () => {
-      vscode.postMessage({ type: 'generate', tool: selector.value, fields: fieldsForTool(selector.value) });
-    });
+    function doGenerate(force) {
+      vscode.postMessage({ type: 'generate', tool: selector.value, fields: fieldsForTool(selector.value), force: !!force });
+      document.getElementById('contractGate').style.display = 'none';
+    }
+    btnGenerate.addEventListener('click', () => doGenerate(false));
+    document.getElementById('btnForceGenerate').addEventListener('click', () => doGenerate(true));
 
     btnRoute.addEventListener('click', () => {
       const text = outputEl.value;
@@ -374,6 +469,10 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       });
     });
 
+    document.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => vscode.postMessage({ type: 'workflow', action: btn.dataset.action }));
+    });
+    document.getElementById('btnPickModel').addEventListener('click', () => vscode.postMessage({ type: 'pickModel' }));
     document.getElementById('btnRefreshAnalytics').addEventListener('click', () => vscode.postMessage({ type: 'refreshAnalyticsFile' }));
 
     function fillContract(c) {
@@ -401,11 +500,19 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
     window.addEventListener('message', (event) => {
       const data = event.data;
-      if (data.type === 'status' || data.type === 'generated') {
-        statusEl.textContent = data.message || '';
+      if (data.type === 'status' || data.type === 'generated' || data.type === 'stream') {
+        statusEl.textContent = data.message || (data.type === 'stream' ? 'Streaming…' : '');
         statusEl.className = data.error ? 'error' : '';
         btnGenerate.disabled = !!data.busy;
         if (data.text) outputEl.value = data.text;
+      }
+      if (data.type === 'contractGate') {
+        document.getElementById('gateMsg').textContent = data.message || 'Contract incomplete.';
+        document.getElementById('contractGate').style.display = 'block';
+        btnGenerate.disabled = false;
+      }
+      if (data.type === 'routeLoaded') {
+        document.getElementById('hubModel').textContent = (data.provider || '—') + ' / ' + (data.model || '—');
       }
       if (data.type === 'contractLoaded' || data.type === 'contractSaved') {
         document.getElementById('contractDraft').textContent = data.draft ? 'Contract for ' + data.draft : 'Open a drafts/*.md file.';
@@ -420,11 +527,15 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         document.getElementById('an_contracts').textContent = s.contractsReady + '/' + s.draftCount;
         document.getElementById('an_chapters').textContent = String(s.draftCount);
         document.getElementById('chapterList').innerHTML = (s.chapters || []).map(c =>
-          '<div>' + c.rel.replace('drafts/', '') + ' — ' + c.words + 'w · ' + c.dialoguePct + '% dlg</div>'
+          '<div data-rel="' + c.rel + '">' + c.rel.replace('drafts/', '') + ' — ' + c.words + 'w · ' + c.dialoguePct + '% dlg</div>'
         ).join('') || '<div>No drafts yet.</div>';
+        document.querySelectorAll('#chapterList [data-rel]').forEach((row) => {
+          row.addEventListener('click', () => vscode.postMessage({ type: 'openChapter', rel: row.dataset.rel }));
+        });
       }
     });
     vscode.postMessage({ type: 'loadContract' });
+    vscode.postMessage({ type: 'loadRoute' });
   </script>
 </body>
 </html>`;

@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { buildWikiIndex } from "./wikiIndex";
 import { listMarkdown } from "./workspaceIo";
 import { retrieveEmbeddingContext } from "./embeddings";
+import { loadVoiceModels, voicePromptForSpeakers } from "./characterVoice";
 
 export async function packContext(opts: {
   prompt: string;
@@ -40,6 +41,15 @@ export async function packContext(opts: {
   if (rel) {
     const loaded = await loadContract(rel);
     if (loaded) chunks.push(contractPrompt(loaded.contract));
+  }
+  const voices = await loadVoiceModels();
+  if (voices.length) {
+    const speakers = [
+      ...[...opts.prompt.matchAll(/\b([A-Z][a-z]+)\b/g)].map((m) => m[1]),
+      ...[...opts.selection.matchAll(/\b([A-Z][a-z]+)\b/g)].map((m) => m[1]),
+    ];
+    const voiceChunk = voicePromptForSpeakers(speakers, voices);
+    if (voiceChunk) chunks.push(voiceChunk);
   }
   if (opts.selection) chunks.push(`Selection:\n${opts.selection.slice(0, 2500)}`);
   else if (opts.openText) chunks.push(`Open draft (tail):\n${opts.openText.slice(-1800)}`);

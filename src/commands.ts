@@ -178,6 +178,12 @@ export async function compileAll() {
   vscode.window.showInformationMessage((await compileManuscript()).join(", "));
 }
 
+export async function exportHtmlCmd() {
+  const { exportHtml } = await import("./services/compiler");
+  const rel = await exportHtml();
+  vscode.window.showInformationMessage(`HTML exported to ${rel}`);
+}
+
 export async function exportLora() {
   const { exportLoraJsonl } = await import("./services/loraExport");
   vscode.window.showInformationMessage(await exportLoraJsonl());

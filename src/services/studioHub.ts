@@ -7,6 +7,9 @@ import { applyPatches, proposeStatePatches } from "./statePatch";
 import { loadState } from "./stateMachine";
 import { automationSettings } from "./automation";
 import { ContinuityDiagnostics } from "./diagnostics";
+import { contractReady, currentDraftRel, loadContract } from "./contracts";
+import { ensureSceneContract } from "./autoContract";
+import * as vscode from "vscode";
 
 export type StudioTool =
   | "storyGen"
@@ -72,7 +75,7 @@ export function assembleToolPrompt(tool: StudioTool, fields: Record<string, stri
         .join("\n\n");
     }
     case "plotTwist":
-      return [block("CURRENT BELIEF / SETUP", fields.premise), block("MUST REMAIN TRUE", fields.constraint)]
+      return [block("CURRENT BELIEF / SETUP", fields.premise), block("WHAT MUST STAY TRUE", fields.constraint)]
         .filter(Boolean)
         .join("\n\n");
     default:
@@ -121,18 +124,33 @@ async function autoStateAndAudit(text: string, diagnostics?: ContinuityDiagnosti
   }
 }
 
+export async function assertContractReady(tool: StudioTool, force?: boolean): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration("novelStudio");
+  if (!cfg.get<boolean>("contractGate") || force || tool !== "storyGen") return;
+  const rel = currentDraftRel();
+  if (!rel) return;
+  const loaded = await loadContract(rel);
+  const contract = loaded?.contract || (await ensureSceneContract(rel));
+  if (!contractReady(contract)) {
+    throw new Error("Scene contract incomplete. Fill the Contract tab or click Generate anyway.");
+  }
+}
+
 export async function generateFromTool(
   text: TextRouter,
   keys: KeyManager,
   tool: StudioTool,
   fields: Record<string, string>,
   diagnostics?: ContinuityDiagnostics,
+  onToken?: (chunk: string) => void,
+  force?: boolean,
 ): Promise<{ output: string; route: string }> {
+  await assertContractReady(tool, force);
   const prompt = assembleToolPrompt(tool, fields);
   if (!prompt.trim()) throw new Error("Fill at least one field before generating.");
 
   const system = `${await loadPrompt(tool === "rephraseGen" ? "rewrite" : "continue")}\n${TOOL_SYSTEM[tool]}`;
-  const output = await generatePacked(text, keys, prompt, system);
+  const output = await generatePacked(text, keys, prompt, system, onToken);
 
   let route = describeRoute(tool, fields);
   const auto = automationSettings();
