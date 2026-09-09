@@ -1,11 +1,12 @@
 import { wordDiff } from "../services/diffUtil";
-import { DEFAULT_TEXT_MODELS, resolveTextModel } from "../services/modelDefaults";
+import { DEFAULT_TEXT_MODELS, resolveModelForTask, resolveTextModel } from "../services/modelDefaults";
+import { parseJsonLoose } from "../services/jsonUtil";
 import { auditContract } from "../services/contractAudit";
 import { cosineSimilarity, filterWordHits, overlapScore, wordCount } from "../services/proseStats";
 import { draftSortKey, parseFrontmatter } from "../services/frontmatter";
 import { epubCss } from "../services/epubThemes";
 import { markdownToHtmlBlocks } from "../services/markdownHtml";
-import { voicePromptForSpeakers } from "../services/characterVoice";
+import { voicePromptForSpeakers } from "../services/voicePrompt";
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -47,6 +48,12 @@ export function runPureTests(): void {
 
   const voice = voicePromptForSpeakers(["Rowan"], [{ name: "Rowan", lines: 5, avgLen: 12, top: ["aye"], sample: "hi" }]);
   assert(voice.includes("Rowan"), "voice prompt");
+
+  assert(resolveModelForTask("ollama", "fast", "fast-m", "writer-m") === "fast-m", "fast tier");
+  assert(resolveModelForTask("ollama", "writer", "fast-m", "writer-m") === "writer-m", "writer tier");
+
+  const parsed = parseJsonLoose<{ goal: string }>('{"goal":"test"}');
+  assert(parsed?.goal === "test", "json loose");
 }
 
 if (require.main === module) {

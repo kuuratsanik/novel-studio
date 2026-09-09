@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.0
+
+### Phase 1 — Local intelligence loop
+- Tiered model router: `novelStudio.fastModel` / `novelStudio.writerModel`
+- Generation cancel (`novelStudio.cancelGeneration`) and Studio Hub Stop button
+- Studio Hub streams prose tools directly into the editor
+- Hybrid RAG v2: keyword + embedding re-rank with speaker boost
+- JSON contract inference via Ollama when available
+
+### Phase 2 — Continuity compiler
+- Manuscript graph in `.novel-studio/graph.json` (rebuilt on save)
+- Continuity quick-fix code actions (fast model rewrite)
+- Graph-aware continuity flags
+
+### Phase 3 — Agentic pipeline
+- **Write Scene Pipeline** command: contract → generate → state → audit
+- Multi-agent uses fast model for editor/continuity passes
+- Outline sync v2 updates existing chapter beats and contracts
+- Workspace `prompts/*.md` hot-loaded in prompt library
+
+### Phase 4 — Publish-ready
+- **Export PDF** via pandoc when installed
+- KDP publish zip includes ISBN field, cover placeholder
+- Local TTS fallback (`espeak` / `pico2wave`) for narration path
+
 ## 1.5.0
 
 - Studio Hub **Workflow** tab: compile, HTML, EPUB, publish zip, outline sync, embeddings, snapshot, audit.

@@ -1,5 +1,3 @@
-import { buildWikiIndex } from "./wikiIndex";
-
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -80,6 +78,7 @@ export function markdownToHtmlBlocks(md: string, wikiTitles: Set<string> = new S
 }
 
 export async function wikiTitleSet(): Promise<Set<string>> {
+  const { buildWikiIndex } = await import("./wikiIndex");
   const { entries } = await buildWikiIndex();
   return new Set(entries.map((e) => e.title.toLowerCase()));
 }

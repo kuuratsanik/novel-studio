@@ -6,6 +6,7 @@ import { listMarkdown } from "./workspaceIo";
 import { draftSortKey, parseFrontmatter } from "./frontmatter";
 import { loadStudioConfig } from "./studioConfig";
 import { filterWordHits, overlapScore } from "./proseStats";
+import { loadManuscriptGraph } from "./manuscriptGraph";
 import * as vscode from "vscode";
 
 export interface ContinuityFlag {
@@ -175,5 +176,21 @@ export async function auditProse(prose: string): Promise<ContinuityFlag[]> {
   }
 
   flags.push(...(await crossChapterFlags(prose, rel)));
+
+  const graph = await loadManuscriptGraph();
+  if (graph && rel) {
+    const chId = `ch:${rel}`;
+    for (const e of graph.entities.filter((x) => x.kind === "character")) {
+      const appears = graph.edges.some((edge) => edge.from === e.id && edge.to === chId);
+      if (!appears && new RegExp(`\\b${e.name}\\b`).test(prose)) {
+        flags.push({
+          message: `${e.name} appears in prose but not in manuscript graph for this chapter (rebuild graph on save).`,
+          severity: "information",
+          matchText: e.name,
+        });
+      }
+    }
+  }
+
   return flags;
 }

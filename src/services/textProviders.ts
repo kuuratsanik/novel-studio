@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
 import { KeyManager } from "./keyManager";
 import { NovelAiService } from "./novelAiService";
-import { resolveTextModel } from "./modelDefaults";
+import { maxTokensForTask, ModelTask, resolveTextModel } from "./modelDefaults";
 
-function maxTokens(): number {
-  return vscode.workspace.getConfiguration("novelStudio").get<number>("maxTokens") ?? 1024;
+function maxTokens(task: ModelTask = "writer"): number {
+  const base = vscode.workspace.getConfiguration("novelStudio").get<number>("maxTokens") ?? 1024;
+  return maxTokensForTask(task, base);
 }
 
 export class TextRouter {
@@ -19,8 +20,18 @@ export class TextRouter {
     context?: string;
     stream?: boolean;
     onToken?: (chunk: string) => void;
+    signal?: AbortSignal;
+    task?: ModelTask;
+    json?: boolean;
   }): Promise<string> {
     const provider = opts.provider || "ollama";
+    const task = opts.task || "writer";
+    const signal = opts.signal;
+
+    if (opts.json && (provider === "ollama" || provider === "kobold")) {
+      return this.generateOllamaJson(opts, signal);
+    }
+
     if (provider === "novelai") {
       const out = await this.novelai.generateText(opts);
       opts.onToken?.(out);
@@ -43,10 +54,11 @@ export class TextRouter {
         },
         body: JSON.stringify({
           model: resolveTextModel(provider, opts.model),
-          max_tokens: maxTokens(),
+          max_tokens: maxTokens(task),
           messages: messages.filter((m) => m.role !== "system"),
           system: opts.systemPrompt,
         }),
+        signal,
       });
       const data = (await res.json()) as { content?: { text?: string }[]; error?: { message?: string } };
       if (!res.ok) throw new Error(data.error?.message || `Anthropic ${res.status}`);
@@ -70,13 +82,13 @@ export class TextRouter {
       headers.Authorization = `Bearer ${await this.keys.requireKey(conf.keyService, `${conf.keyService} key missing.`)}`;
     }
     const model = resolveTextModel(provider, opts.model);
-    const body = { model, messages, temperature: 0.8, max_tokens: maxTokens(), stream: !!opts.stream };
+    const body = { model, messages, temperature: 0.8, max_tokens: maxTokens(task), stream: !!opts.stream };
 
     if (opts.stream && opts.onToken) {
-      return this.streamOpenAi(conf.url, headers, body, opts.onToken);
+      return this.streamOpenAi(conf.url, headers, body, opts.onToken, signal);
     }
 
-    const res = await fetch(conf.url, { method: "POST", headers, body: JSON.stringify(body) });
+    const res = await fetch(conf.url, { method: "POST", headers, body: JSON.stringify(body), signal });
     const raw = await res.text();
     if (!res.ok) throw new Error(`${provider} ${res.status}: ${raw.slice(0, 300)}`);
     const data = JSON.parse(raw) as { choices?: { message?: { content?: string } }[] };
@@ -85,13 +97,35 @@ export class TextRouter {
     return out.trim();
   }
 
+  private async generateOllamaJson(
+    opts: { localUrl?: string; model: string; prompt: string; systemPrompt?: string; context?: string },
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const url = `${(opts.localUrl || "http://127.0.0.1:11434").replace(/\/$/, "")}/api/generate`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: resolveTextModel("ollama", opts.model),
+        prompt: [opts.systemPrompt, opts.context, opts.prompt].filter(Boolean).join("\n\n"),
+        format: "json",
+        stream: false,
+      }),
+      signal,
+    });
+    if (!res.ok) throw new Error(`ollama json ${res.status}`);
+    const data = (await res.json()) as { response?: string };
+    return (data.response || "").trim();
+  }
+
   private async streamOpenAi(
     url: string,
     headers: Record<string, string>,
     body: Record<string, unknown>,
     onToken: (chunk: string) => void,
+    signal?: AbortSignal,
   ): Promise<string> {
-    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
     if (!res.ok) throw new Error(`stream ${res.status}: ${(await res.text()).slice(0, 300)}`);
     if (!res.body) throw new Error("stream body missing");
 

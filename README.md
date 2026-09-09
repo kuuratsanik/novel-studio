@@ -38,6 +38,14 @@ v1.4 adds an **Analytics** tab (live word counts, progress, per-chapter stats), 
 
 v1.5 adds a **Workflow** tab (compile, HTML, EPUB, KDP zip), sidebar streaming, contract gate, cross-chapter continuity audit, voice-model context, incremental embeddings, and clickable chapters in Analytics.
 
+v2.0 adds **tiered local models** (7B fast / 32B writer), generation cancel, editor streaming from Hub, hybrid RAG, manuscript graph, continuity quick-fixes, **Write Scene Pipeline**, outline sync v2, and PDF export.
+
+```bash
+ollama pull qwen2.5:7b-instruct
+ollama pull qwen2.5:32b-instruct
+ollama pull nomic-embed-text
+```
+
 ## Routing
 
 | Tool | Destination |

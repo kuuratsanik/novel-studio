@@ -3,7 +3,7 @@ import { ensurePromptLibrary } from "./prompts";
 
 export async function bootstrapWorkspace(title = "Untitled Novel"): Promise<string> {
   const files: Record<string, string> = {
-    "studio.json": JSON.stringify({ pov: "third", tense: "past", wordTarget: 80000, banned: ["suddenly", "realized"] }, null, 2) + "\n",
+    "studio.json": JSON.stringify({ title: title, pov: "third", tense: "past", wordTarget: 80000, isbn: "", banned: ["suddenly", "realized"] }, null, 2) + "\n",
     "codex/state.json": JSON.stringify({ updated: new Date().toISOString(), characters: [] }, null, 2) + "\n",
     "codex/characters.md": `# Characters\n\n## Protagonist\n\nDrive, flaw, voice.\n`,
     "codex/world_lore.md": `# World\n\nRules of this setting.\n`,

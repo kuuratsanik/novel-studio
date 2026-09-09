@@ -18,11 +18,12 @@ export async function publishPackage(): Promise<string> {
   const base = `compile/publish-${stamp}`;
   const manifest = {
     title,
+    isbn: studio.isbn || "",
     wordTarget: studio.wordTarget || 80000,
     pov: studio.pov || "third",
     tense: studio.tense || "past",
     built: new Date().toISOString(),
-    files: ["manuscript.md", "manuscript.html", "analytics.md"],
+    files: ["manuscript.md", "manuscript.html", "analytics.md", "cover-placeholder.txt"],
   };
 
   await writeWorkspaceFile(`${base}/README.md`, `# ${title} — publish pack\n\nGenerated ${manifest.built}.\n`);
@@ -35,6 +36,7 @@ export async function publishPackage(): Promise<string> {
     analytics = "# Analytics\n\nRun Novel Studio: Analytics Dashboard first.\n";
   }
   await writeWorkspaceFile(`${base}/analytics.md`, analytics);
+  await writeWorkspaceFile(`${base}/cover-placeholder.txt`, `Cover image placeholder for "${title}". Replace before KDP upload.\n`);
 
   const root = workspaceRoot();
   const buildDir = path.join(root, base);

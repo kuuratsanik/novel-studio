@@ -8,9 +8,15 @@ import { loadPrompt, ensurePromptLibrary, listPrompts } from "./services/prompts
 import { logUsage } from "./services/usage";
 import { REVISION_MODES, RevisionMode } from "./services/revisionModes";
 import { formatDiff, wordDiff } from "./services/diffUtil";
-import { LOCAL_TEXT_PROVIDERS, resolveTextModel } from "./services/modelDefaults";
+import {
+  LOCAL_TEXT_PROVIDERS,
+  ModelTask,
+  resolveModelForTask,
+  resolveTextModel,
+} from "./services/modelDefaults";
 import { automationSettings, probeLocalEngine } from "./services/automation";
 import { ensureSceneContract } from "./services/autoContract";
+import { beginGeneration, cancelGeneration, endGeneration, isGenerating } from "./services/generationQueue";
 
 export function selection(): string {
   const ed = vscode.window.activeTextEditor;
@@ -34,37 +40,57 @@ export function replaceSel(text: string) {
   void ed.edit((b) => b.replace(ed.selection, text));
 }
 
-export async function pickRoute(keys: KeyManager): Promise<{ provider: string; model: string; localUrl: string }> {
+export async function pickRoute(
+  keys: KeyManager,
+  task: ModelTask = "writer",
+): Promise<{ provider: string; model: string; localUrl: string }> {
   const cfg = vscode.workspace.getConfiguration("novelStudio");
   const offline = cfg.get<boolean>("offlineFirst") ?? false;
   const forced = cfg.get<string>("defaultProvider") || "";
   const defaultModel = cfg.get<string>("defaultModel") || "";
+  const fastModel = cfg.get<string>("fastModel") || "qwen2.5:7b-instruct";
+  const writerModel = cfg.get<string>("writerModel") || "qwen2.5:32b-instruct";
   const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
   const auto = automationSettings();
+
+  let provider = "ollama";
   if (forced && forced !== "auto") {
-    return { provider: forced, model: resolveTextModel(forced, defaultModel || "auto"), localUrl };
+    provider = forced;
+  } else if ((auto.offlineFirst || auto.fullyAutomatic) && (await probeLocalEngine(localUrl))) {
+    provider = "ollama";
+  } else {
+    const hasCloud =
+      (await keys.hasKey("openrouter")) ||
+      (await keys.hasKey("anthropic")) ||
+      (await keys.hasKey("openai")) ||
+      (await keys.hasKey("novelai"));
+    if (offline || !hasCloud) {
+      provider = "ollama";
+    } else if (await keys.hasKey("anthropic")) {
+      provider = "anthropic";
+    } else if (await keys.hasKey("openrouter")) {
+      provider = "openrouter";
+    } else if (await keys.hasKey("openai")) {
+      provider = "openai";
+    } else {
+      provider = "novelai";
+    }
   }
-  if ((auto.offlineFirst || auto.fullyAutomatic) && (await probeLocalEngine(localUrl))) {
-    return { provider: "ollama", model: resolveTextModel("ollama", defaultModel || "auto"), localUrl };
+
+  const model = LOCAL_TEXT_PROVIDERS.has(provider)
+    ? resolveModelForTask(provider, task, fastModel, writerModel)
+    : resolveTextModel(provider, defaultModel || "auto");
+
+  return { provider, model, localUrl };
+}
+
+export function cancelGenerationCmd(): void {
+  if (!isGenerating()) {
+    vscode.window.showInformationMessage("No generation in progress.");
+    return;
   }
-  const hasCloud =
-    (await keys.hasKey("openrouter")) ||
-    (await keys.hasKey("anthropic")) ||
-    (await keys.hasKey("openai")) ||
-    (await keys.hasKey("novelai"));
-  if (offline || !hasCloud) {
-    return { provider: "ollama", model: resolveTextModel("ollama", defaultModel || "auto"), localUrl };
-  }
-  if (await keys.hasKey("anthropic")) {
-    return { provider: "anthropic", model: resolveTextModel("anthropic", defaultModel || "auto"), localUrl };
-  }
-  if (await keys.hasKey("openrouter")) {
-    return { provider: "openrouter", model: resolveTextModel("openrouter", defaultModel || "auto"), localUrl };
-  }
-  if (await keys.hasKey("openai")) {
-    return { provider: "openai", model: resolveTextModel("openai", defaultModel || "auto"), localUrl };
-  }
-  return { provider: "novelai", model: resolveTextModel("novelai", defaultModel || "auto"), localUrl };
+  cancelGeneration();
+  vscode.window.showInformationMessage("Generation cancelled.");
 }
 
 export async function generatePacked(
@@ -73,38 +99,49 @@ export async function generatePacked(
   prompt: string,
   systemPrompt: string,
   onToken?: (chunk: string) => void,
+  task: ModelTask = "writer",
 ) {
-  const route = await pickRoute(keys);
-  const privacy = vscode.workspace.getConfiguration("novelStudio").get<boolean>("privacyLocalCodex") ?? false;
-  const stream = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
-  const cloud = !LOCAL_TEXT_PROVIDERS.has(route.provider);
-  const context = await packContext({
-    prompt,
-    selection: selection(),
-    openText: activeText(),
-    useRag: !(privacy && cloud),
-    useBible: !(privacy && cloud),
-    useStyle: true,
-    allowException: false,
-    ollamaUrl: route.localUrl,
-  });
-  const out = await text.generate({
-    provider: route.provider,
-    model: route.model,
-    localUrl: route.localUrl,
-    prompt,
-    systemPrompt,
-    context,
-    stream: stream && !!onToken && LOCAL_TEXT_PROVIDERS.has(route.provider),
-    onToken,
-  });
-  await logUsage({
-    provider: route.provider,
-    model: route.model,
-    promptChars: prompt.length + context.length,
-    outputChars: out.length,
-  }).catch(() => undefined);
-  return out;
+  const signal = beginGeneration();
+  try {
+    const route = await pickRoute(keys, task);
+    const privacy = vscode.workspace.getConfiguration("novelStudio").get<boolean>("privacyLocalCodex") ?? false;
+    const stream = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
+    const cloud = !LOCAL_TEXT_PROVIDERS.has(route.provider);
+    const context = await packContext({
+      prompt,
+      selection: selection(),
+      openText: activeText(),
+      useRag: !(privacy && cloud),
+      useBible: !(privacy && cloud),
+      useStyle: true,
+      allowException: false,
+      ollamaUrl: route.localUrl,
+    });
+    const out = await text.generate({
+      provider: route.provider,
+      model: route.model,
+      localUrl: route.localUrl,
+      prompt,
+      systemPrompt,
+      context,
+      stream: stream && !!onToken && LOCAL_TEXT_PROVIDERS.has(route.provider),
+      onToken,
+      signal,
+      task,
+    });
+    await logUsage({
+      provider: route.provider,
+      model: route.model,
+      promptChars: prompt.length + context.length,
+      outputChars: out.length,
+    }).catch(() => undefined);
+    return out;
+  } catch (err) {
+    if (signal.aborted) throw new Error("Generation cancelled.");
+    throw err;
+  } finally {
+    endGeneration();
+  }
 }
 
 export async function continueScene(text: TextRouter, keys: KeyManager, diagnostics?: import("./services/diagnostics").ContinuityDiagnostics) {
@@ -121,7 +158,7 @@ export async function continueScene(text: TextRouter, keys: KeyManager, diagnost
     const { StreamInserter } = await import("./services/streamInserter");
     const sink = new StreamInserter(ed);
     await sink.begin();
-    out = await generatePacked(text, keys, prompt, sys, (chunk) => void sink.push(chunk));
+    out = await generatePacked(text, keys, prompt, sys, (chunk) => void sink.push(chunk), "writer");
     out = await sink.finish();
   } else {
     out = await generatePacked(text, keys, prompt, sys);
@@ -159,13 +196,34 @@ export async function diffRewrite(text: TextRouter, keys: KeyManager) {
 
 export async function multiAgent(text: TextRouter, keys: KeyManager) {
   const src = selection() || activeText().slice(-2000);
-  const draft = await generatePacked(text, keys, src, "Role: writer. Continue the scene.");
-  const edited = await generatePacked(text, keys, draft, "Role: editor. Tighten only.");
+  const draft = await generatePacked(text, keys, src, "Role: writer. Continue the scene.", undefined, "writer");
+  const edited = await generatePacked(text, keys, draft, "Role: editor. Tighten only.", undefined, "fast");
   const auto = automationSettings();
   const final = auto.fullyAutomatic
-    ? await generatePacked(text, keys, edited, await loadPrompt("continuity"))
+    ? await generatePacked(text, keys, edited, await loadPrompt("continuity"), undefined, "fast")
     : edited;
   insert(final);
+}
+
+export async function writeSceneCmd(
+  text: TextRouter,
+  keys: KeyManager,
+  diagnostics?: ContinuityDiagnostics,
+) {
+  const { runScenePipeline } = await import("./services/scenePipeline");
+  const msg = await runScenePipeline(text, keys, diagnostics);
+  vscode.window.showInformationMessage(msg);
+}
+
+export async function fixContinuityCmd(
+  text: TextRouter,
+  keys: KeyManager,
+  message: string,
+  uri: string,
+  range: vscode.Range,
+) {
+  const { fixContinuityIssue } = await import("./services/continuityFixes");
+  await fixContinuityIssue(text, keys, message, uri, range);
 }
 
 export async function runAudit(diagnostics: ContinuityDiagnostics) {
@@ -182,6 +240,12 @@ export async function exportHtmlCmd() {
   const { exportHtml } = await import("./services/compiler");
   const rel = await exportHtml();
   vscode.window.showInformationMessage(`HTML exported to ${rel}`);
+}
+
+export async function exportPdfCmd() {
+  const { exportPdf } = await import("./services/compiler");
+  const rel = await exportPdf();
+  vscode.window.showInformationMessage(`PDF export: ${rel}`);
 }
 
 export async function exportLora() {

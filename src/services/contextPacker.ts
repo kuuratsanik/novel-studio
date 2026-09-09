@@ -5,7 +5,9 @@ import * as vscode from "vscode";
 import { buildWikiIndex } from "./wikiIndex";
 import { listMarkdown } from "./workspaceIo";
 import { retrieveEmbeddingContext } from "./embeddings";
-import { loadVoiceModels, voicePromptForSpeakers } from "./characterVoice";
+import { loadVoiceModels } from "./characterVoice";
+import { voicePromptForSpeakers } from "./voicePrompt";
+import { overlapScore } from "./proseStats";
 
 export async function packContext(opts: {
   prompt: string;
@@ -16,19 +18,12 @@ export async function packContext(opts: {
   useStyle: boolean;
   allowException: boolean;
   ollamaUrl: string;
+  speakers?: string[];
 }): Promise<string> {
   const chunks: string[] = [];
   if (opts.useRag) {
-    const keyword = await retrieveRagContext(opts.prompt, opts.selection);
-    if (keyword) chunks.push(keyword);
-    const useEmbeddings = vscode.workspace.getConfiguration("novelStudio").get<boolean>("embeddingRag") ?? true;
-    if (useEmbeddings) {
-      const embedded = await retrieveEmbeddingContext(
-        `${opts.prompt}\n${opts.selection}`,
-        opts.ollamaUrl,
-      ).catch(() => "");
-      if (embedded) chunks.push(embedded);
-    }
+    const hybrid = await retrieveHybridContext(opts.prompt, opts.selection, opts.ollamaUrl, opts.speakers);
+    if (hybrid) chunks.push(hybrid);
   }
   if (opts.useBible) {
     const bible = await loadBible();
@@ -44,7 +39,7 @@ export async function packContext(opts: {
   }
   const voices = await loadVoiceModels();
   if (voices.length) {
-    const speakers = [
+    const speakers = opts.speakers || [
       ...[...opts.prompt.matchAll(/\b([A-Z][a-z]+)\b/g)].map((m) => m[1]),
       ...[...opts.selection.matchAll(/\b([A-Z][a-z]+)\b/g)].map((m) => m[1]),
     ];
@@ -57,32 +52,67 @@ export async function packContext(opts: {
   return chunks.filter(Boolean).join("\n\n");
 }
 
-async function retrieveRagContext(prompt: string, selection: string): Promise<string> {
-  const query = `${prompt} ${selection}`.toLowerCase();
-  const queryTokens = query.split(/\s+/).filter((t) => t.length > 3);
-  if (!queryTokens.length) return "";
+interface RagCandidate {
+  path: string;
+  title: string;
+  text: string;
+  keywordScore: number;
+  embedScore: number;
+}
 
+async function retrieveHybridContext(
+  prompt: string,
+  selection: string,
+  ollamaUrl: string,
+  speakers?: string[],
+): Promise<string> {
+  const query = `${prompt} ${selection}`.trim();
+  if (!query) return "";
+
+  const queryLower = query.toLowerCase();
+  const queryTokens = queryLower.split(/\s+/).filter((t) => t.length > 3);
   const { entries } = await buildWikiIndex();
   const files = await listMarkdown();
   const fileText = new Map(files.map((f) => [f.rel, f.text]));
+  const byKey = new Map<string, RagCandidate>();
 
-  const scored = entries
-    .map((e) => {
-      const title = e.title.toLowerCase();
-      let score = queryTokens.filter((t) => title.includes(t) || query.includes(title)).length;
-      if (selection && title.length > 2 && selection.toLowerCase().includes(title)) score += 2;
-      return { e, score };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+  for (const e of entries) {
+    const title = e.title.toLowerCase();
+    let keywordScore = queryTokens.filter((t) => title.includes(t) || queryLower.includes(title)).length;
+    if (selection && title.length > 2 && selection.toLowerCase().includes(title)) keywordScore += 2;
+    if (speakers?.some((s) => title.includes(s.toLowerCase()))) keywordScore += 3;
+    if (keywordScore <= 0) continue;
+    const text = (fileText.get(e.path) || "").slice(0, 1200);
+    const key = `${e.path}::${e.title}`;
+    byKey.set(key, { path: e.path, title: e.title, text, keywordScore, embedScore: 0 });
+  }
 
-  if (!scored.length) return "";
+  const embedded = await retrieveEmbeddingContext(query, ollamaUrl, 5).catch(() => "");
+  for (const block of embedded.split(/\n\n+/)) {
+    const m = block.match(/^Source ([^\s]+) \(sim ([0-9.]+)\):\n([\s\S]*)$/);
+    if (!m) continue;
+    const [, path, sim, text] = m;
+    const key = `${path}::embed`;
+    const existing = byKey.get(key);
+    const embedScore = Number(sim);
+    if (existing) {
+      existing.embedScore = Math.max(existing.embedScore, embedScore);
+    } else {
+      byKey.set(key, { path, title: path, text, keywordScore: 0, embedScore });
+    }
+  }
 
-  const parts = scored.map(({ e }) => {
-    const text = fileText.get(e.path) || "";
-    const chunk = text.slice(0, 1200);
-    return `Source ${e.path} — ${e.title}:\n${chunk}`;
-  });
-  return `Retrieved context:\n${parts.join("\n\n")}`;
+  const ranked = [...byKey.values()]
+    .map((c) => ({
+      c,
+      total: c.keywordScore * 2 + c.embedScore + overlapScore(query, c.text) * 0.5,
+    }))
+    .filter((x) => x.total > 0.15)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 4);
+
+  if (!ranked.length) return "";
+
+  const parts = ranked.map(({ c }) => `Source ${c.path} — ${c.title}:\n${c.text}`);
+  return `Retrieved context (hybrid):\n${parts.join("\n\n")}`;
 }

@@ -59,3 +59,24 @@ export async function exportHtml(): Promise<string> {
 
   return writeWorkspaceFile("compile/manuscript.html", html);
 }
+
+export async function exportPdf(): Promise<string> {
+  await exportHtml();
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) throw new Error("Open a folder workspace first.");
+  const htmlPath = `${root}/compile/manuscript.html`;
+  const outRel = "compile/manuscript.pdf";
+  try {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const exec = promisify(execFile);
+    await exec("pandoc", [htmlPath, "-o", `${root}/${outRel}`], { timeout: 120_000 });
+    return outRel;
+  } catch {
+    await writeWorkspaceFile(
+      "compile/pdf-README.md",
+      "# PDF export\n\nInstall `pandoc` then run:\n\n```bash\npandoc compile/manuscript.html -o compile/manuscript.pdf\n```\n",
+    );
+    return "compile/pdf-README.md";
+  }
+}

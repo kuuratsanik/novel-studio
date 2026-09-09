@@ -12,6 +12,8 @@ import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./
 import { WikiLinkCompletionProvider, WikiLinkHoverProvider } from "./services/wikiProviders";
 import { scheduleEmbeddingRebuild } from "./services/embeddingScheduler";
 import { invalidateMarkdownCache } from "./services/workspaceIo";
+import { ContinuityCodeActionProvider } from "./services/continuityFixes";
+import { saveManuscriptGraph } from "./services/manuscriptGraph";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -50,6 +52,10 @@ export function activate(context: vscode.ExtensionContext) {
     await status.refresh();
   }, 1200);
 
+  const graphOnSave = debounce(async () => {
+    await saveManuscriptGraph().catch(() => undefined);
+  }, 3000);
+
   context.subscriptions.push(
     diagnostics.disposable,
     status.disposable,
@@ -57,6 +63,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerCodeLensProvider({ language: "markdown" }, lenses),
     vscode.languages.registerCompletionItemProvider({ language: "markdown" }, new WikiLinkCompletionProvider(), "[", "[["),
     vscode.languages.registerHoverProvider({ language: "markdown" }, new WikiLinkHoverProvider()),
+    vscode.languages.registerCodeActionsProvider(
+      { language: "markdown" },
+      new ContinuityCodeActionProvider(text, keyManager),
+      { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
+    ),
     vscode.commands.registerCommand("novelStudio.setKey", wrap(async () => {
       const service = await vscode.window.showQuickPick([...SECRET_SERVICES], { title: "Which service key?" });
       if (!service) return;
@@ -78,6 +89,18 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.auditContinuity", wrap(() => cmds.runAudit(diagnostics))),
     vscode.commands.registerCommand("novelStudio.compileManuscript", wrap(() => cmds.compileAll())),
     vscode.commands.registerCommand("novelStudio.exportHtml", wrap(() => cmds.exportHtmlCmd())),
+    vscode.commands.registerCommand("novelStudio.exportPdf", wrap(() => cmds.exportPdfCmd())),
+    vscode.commands.registerCommand("novelStudio.cancelGeneration", wrap(async () => cmds.cancelGenerationCmd())),
+    vscode.commands.registerCommand("novelStudio.writeScene", wrap(() => cmds.writeSceneCmd(text, keyManager, diagnostics))),
+    vscode.commands.registerCommand(
+      "novelStudio.fixContinuity",
+      wrap(async (...args: unknown[]) => {
+        const message = String(args[0] || "");
+        const uri = String(args[1] || "");
+        const range = args[2] as vscode.Range;
+        await cmds.fixContinuityCmd(text, keyManager, message, uri, range);
+      }),
+    ),
     vscode.commands.registerCommand("novelStudio.exportLora", wrap(() => cmds.exportLora())),
     vscode.commands.registerCommand("novelStudio.audiobookBatch", wrap(() => cmds.batchAudiobook(audio))),
     vscode.commands.registerCommand("novelStudio.runPrompt", wrap(() => cmds.pickPromptAndRun(text, keyManager))),
@@ -125,6 +148,7 @@ export function activate(context: vscode.ExtensionContext) {
         invalidateMarkdownCache();
         void auditIfAutomatic();
         scheduleEmbeddingRebuild(doc);
+        graphOnSave();
         provider.refreshOnEditorChange();
       }
     }),

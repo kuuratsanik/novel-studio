@@ -71,6 +71,11 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             });
             break;
           }
+          case "cancel": {
+            await vscode.commands.executeCommand("novelStudio.cancelGeneration");
+            this._post({ type: "status", busy: false, message: "Cancelled." });
+            break;
+          }
           case "loadRoute": {
             await this._sendRoute();
             break;
@@ -85,12 +90,14 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             const map: Record<string, string> = {
               compile: "novelStudio.compileManuscript",
               html: "novelStudio.exportHtml",
+              pdf: "novelStudio.exportPdf",
               epub: "novelStudio.exportEpub",
               outline: "novelStudio.outlineSync",
               embeddings: "novelStudio.rebuildEmbeddings",
               snapshot: "novelStudio.compareSnapshot",
               publish: "novelStudio.publishPackage",
               audit: "novelStudio.auditContinuity",
+              writeScene: "novelStudio.writeScene",
             };
             const cmd = map[String(data.action)];
             if (!cmd) throw new Error(`Unknown workflow action: ${data.action}`);
@@ -370,6 +377,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
   <div id="contractGate"><span id="gateMsg"></span><button class="btn-secondary" id="btnForceGenerate" style="margin-top:6px">Generate anyway</button></div>
   <button id="btnGenerate">Generate & Route Automatically</button>
+  <button class="btn-secondary" id="btnStopGenerate">Stop generation</button>
   <div id="status"></div>
 
   <hr/>
@@ -414,6 +422,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       <button data-action="embeddings">Rebuild embeddings</button>
       <button data-action="snapshot">Compare snapshot</button>
       <button data-action="audit">Continuity audit</button>
+      <button data-action="writeScene">Scene pipeline</button>
+      <button data-action="pdf">Export PDF</button>
     </div>
   </section>
 
@@ -451,6 +461,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     }
     btnGenerate.addEventListener('click', () => doGenerate(false));
     document.getElementById('btnForceGenerate').addEventListener('click', () => doGenerate(true));
+    document.getElementById('btnStopGenerate').addEventListener('click', () => vscode.postMessage({ type: 'cancel' }));
 
     btnRoute.addEventListener('click', () => {
       const text = outputEl.value;

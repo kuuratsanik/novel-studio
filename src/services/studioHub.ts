@@ -1,3 +1,4 @@
+import * as vscode from "vscode";
 import { generatePacked, insert, replaceSel, selection } from "../commands";
 import { TextRouter } from "./textProviders";
 import { KeyManager } from "./keyManager";
@@ -9,7 +10,7 @@ import { automationSettings } from "./automation";
 import { ContinuityDiagnostics } from "./diagnostics";
 import { contractReady, currentDraftRel, loadContract } from "./contracts";
 import { ensureSceneContract } from "./autoContract";
-import * as vscode from "vscode";
+import { StreamInserter } from "./streamInserter";
 
 export type StudioTool =
   | "storyGen"
@@ -18,6 +19,8 @@ export type StudioTool =
   | "dialogueGen"
   | "rephraseGen"
   | "plotTwist";
+
+const PROSE_TOOLS = new Set<StudioTool>(["storyGen", "dialogueGen"]);
 
 const TOOL_SYSTEM: Record<StudioTool, string> = {
   storyGen: "Write fiction prose only. Match the series voice. No meta commentary or outlines unless asked.",
@@ -75,7 +78,7 @@ export function assembleToolPrompt(tool: StudioTool, fields: Record<string, stri
         .join("\n\n");
     }
     case "plotTwist":
-      return [block("CURRENT BELIEF / SETUP", fields.premise), block("WHAT MUST STAY TRUE", fields.constraint)]
+      return [block("CURRENT BELIEF / SETUP", fields.premise), block("MUST REMAIN TRUE", fields.constraint)]
         .filter(Boolean)
         .join("\n\n");
     default:
@@ -150,11 +153,32 @@ export async function generateFromTool(
   if (!prompt.trim()) throw new Error("Fill at least one field before generating.");
 
   const system = `${await loadPrompt(tool === "rephraseGen" ? "rewrite" : "continue")}\n${TOOL_SYSTEM[tool]}`;
-  const output = await generatePacked(text, keys, prompt, system, onToken);
+  const auto = automationSettings();
+  const streamOn = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
+  const ed = vscode.window.activeTextEditor;
+  const streamToEditor = auto.autoRouteSidebarOutput && PROSE_TOOLS.has(tool) && !!ed && streamOn;
+
+  let sink: StreamInserter | undefined;
+  if (streamToEditor && ed) {
+    sink = new StreamInserter(ed);
+    await sink.begin();
+  }
+
+  const combinedOnToken = sink || onToken
+    ? (chunk: string) => {
+        void sink?.push(chunk);
+        onToken?.(chunk);
+      }
+    : undefined;
+
+  const output = await generatePacked(text, keys, prompt, system, combinedOnToken, "writer");
 
   let route = describeRoute(tool, fields);
-  const auto = automationSettings();
-  if (auto.autoRouteSidebarOutput) {
+  if (streamToEditor && sink) {
+    await sink.finish();
+    route = "streamed into editor";
+    await autoStateAndAudit(output, diagnostics);
+  } else if (auto.autoRouteSidebarOutput) {
     route = await routeOutput(tool, fields, output);
     await autoStateAndAudit(output, diagnostics);
   }

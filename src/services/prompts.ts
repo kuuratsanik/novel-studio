@@ -1,4 +1,4 @@
-import { readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
+import { listMarkdown, readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
 
 const DEFAULTS: Record<string, string> = {
   continue: "Continue the scene in the established voice. Do not recap. Advance the beat.",
@@ -31,5 +31,9 @@ export async function loadPrompt(name: string): Promise<string> {
 
 export async function listPrompts(): Promise<string[]> {
   await ensurePromptLibrary();
-  return Object.keys(DEFAULTS);
+  const files = await listMarkdown();
+  const fromDisk = files
+    .filter((f) => f.rel.startsWith("prompts/") && f.rel.endsWith(".md"))
+    .map((f) => f.rel.replace(/^prompts\//, "").replace(/\.md$/, ""));
+  return [...new Set([...Object.keys(DEFAULTS), ...fromDisk])].sort();
 }

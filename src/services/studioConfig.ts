@@ -2,6 +2,7 @@ import { readWorkspaceFile } from "./workspaceIo";
 
 export interface StudioConfig {
   title?: string;
+  isbn?: string;
   pov?: "first" | "third" | string;
   tense?: "past" | "present" | string;
   wordTarget?: number;
