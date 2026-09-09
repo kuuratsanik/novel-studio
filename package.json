@@ -70,7 +70,7 @@
         "novelStudio.privacyLocalCodex": {
           "type": "boolean",
           "default": false,
-          "description": "Do not send series bible or RAG context to cloud providers."
+          "description": "Do not send locally authored codex material (series bible and codex/state.json) to cloud providers. Local engines are unaffected."
         },
         "novelStudio.requestTimeoutMs": {
           "type": "number",

@@ -82,11 +82,8 @@ export async function generatePacked(
     prompt,
     selection: selection(),
     openText: activeText(),
-    useRag: shareCodex,
-    useBible: shareCodex,
-    useStyle: true,
+    shareCodex,
     allowException: false,
-    ollamaUrl: route.localUrl,
   });
 
   const out = await vscode.window.withProgress(
