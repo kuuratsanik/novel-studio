@@ -34,6 +34,8 @@ Additional automation in v1.2+: streaming local generation, wiki `[[link]]` auto
 
 v1.3 adds a **Contract** tab in Studio Hub, semantic embedding RAG (`ollama pull nomic-embed-text`), EPUB export, and snapshot diff view.
 
+v1.4 adds an **Analytics** tab (live word counts, progress, per-chapter stats), auto-rebuild embeddings on save (`novelStudio.autoRebuildEmbeddings`), and EPUB themes (`novelStudio.epubTheme`: serif, sans, dark).
+
 ## Routing
 
 | Tool | Destination |

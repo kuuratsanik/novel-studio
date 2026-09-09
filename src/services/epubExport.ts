@@ -1,8 +1,10 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
+import * as vscode from "vscode";
 import { listMarkdown, readWorkspaceFile, workspaceRoot, writeWorkspaceFile } from "./workspaceIo";
 import { draftSortKey } from "./frontmatter";
+import { epubCss, EpubTheme } from "./epubThemes";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,10 +54,8 @@ export async function exportEpub(title = "Manuscript"): Promise<string> {
     `${base}/META-INF/container.xml`,
     `<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`,
   );
-  await writeWorkspaceFile(
-    `${base}/OEBPS/style.css`,
-    `body{font-family:Georgia,serif;line-height:1.6;margin:1.2em;} h1,h2,h3{page-break-after:avoid;}`,
-  );
+  const theme = (vscode.workspace.getConfiguration("novelStudio").get<string>("epubTheme") || "serif") as EpubTheme;
+  await writeWorkspaceFile(`${base}/OEBPS/style.css`, epubCss(theme));
 
   const items: string[] = [];
   const spine: string[] = [];

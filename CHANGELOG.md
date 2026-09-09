@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+- Studio Hub **Analytics** tab with live word counts, progress bar, and per-chapter stats.
+- Auto-rebuild embedding index on save (`novelStudio.autoRebuildEmbeddings`).
+- EPUB themes: serif, sans, dark (`novelStudio.epubTheme`).
+- Integration test scaffold via `@vscode/test-electron` (`npm run test:integration`).
+
 ## 1.3.0
 
 - Studio Hub **Contract** tab: edit, auto-infer, and save scene contracts in the sidebar.

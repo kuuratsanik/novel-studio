@@ -2,7 +2,17 @@ import { listMarkdown, writeWorkspaceFile, readWorkspaceFile } from "./workspace
 import { dialogueRatio, wordCount } from "./proseStats";
 import { loadContract, contractReady } from "./contracts";
 
-export async function writeAnalytics(): Promise<void> {
+export interface AnalyticsSnapshot {
+  totalWords: number;
+  wordTarget: number;
+  progressPct: number;
+  draftCount: number;
+  contractsReady: number;
+  codexFiles: number;
+  chapters: { rel: string; words: number; dialoguePct: number }[];
+}
+
+export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
   const files = await listMarkdown();
   const drafts = files.filter((f) => f.rel.startsWith("drafts/") && !f.rel.includes("/contracts/"));
   const totalWords = drafts.reduce((n, f) => n + wordCount(f.text), 0);
@@ -12,7 +22,7 @@ export async function writeAnalytics(): Promise<void> {
     const studio = JSON.parse(await readWorkspaceFile("studio.json")) as { wordTarget?: number };
     if (studio.wordTarget) target = studio.wordTarget;
   } catch {
-    // default target
+    // default
   }
 
   let contractsReady = 0;
@@ -21,26 +31,45 @@ export async function writeAnalytics(): Promise<void> {
     if (loaded && contractReady(loaded.contract)) contractsReady++;
   }
 
+  const chapters = drafts
+    .sort((a, b) => a.rel.localeCompare(b.rel))
+    .map((f) => ({
+      rel: f.rel,
+      words: wordCount(f.text),
+      dialoguePct: Math.round(dialogueRatio(f.text) * 100),
+    }));
+
+  return {
+    totalWords,
+    wordTarget: target,
+    progressPct: target ? Math.round((totalWords / target) * 1000) / 10 : 0,
+    draftCount: drafts.length,
+    contractsReady,
+    codexFiles: files.length - drafts.length,
+    chapters,
+  };
+}
+
+export async function writeAnalytics(): Promise<void> {
+  const snap = await getAnalyticsSnapshot();
   const lines = [
     "# Analytics",
     "",
     `| Metric | Value |`,
     `|---|---:|`,
-    `| Draft files | ${drafts.length} |`,
-    `| Total words | ${totalWords} |`,
-    `| Word target | ${target} |`,
-    `| Progress | ${((totalWords / target) * 100).toFixed(1)}% |`,
-    `| Contracts ready | ${contractsReady}/${drafts.length} |`,
-    `| Codex / other md | ${files.length - drafts.length} |`,
+    `| Draft files | ${snap.draftCount} |`,
+    `| Total words | ${snap.totalWords} |`,
+    `| Word target | ${snap.wordTarget} |`,
+    `| Progress | ${snap.progressPct}% |`,
+    `| Contracts ready | ${snap.contractsReady}/${snap.draftCount} |`,
+    `| Codex / other md | ${snap.codexFiles} |`,
     "",
     "## Per chapter",
     "",
   ];
 
-  for (const f of drafts.sort((a, b) => a.rel.localeCompare(b.rel))) {
-    const w = wordCount(f.text);
-    const ratio = (dialogueRatio(f.text) * 100).toFixed(0);
-    lines.push(`- ${f.rel}: ${w} words · ${ratio}% dialogue-ish lines`);
+  for (const ch of snap.chapters) {
+    lines.push(`- ${ch.rel}: ${ch.words} words · ${ch.dialoguePct}% dialogue-ish lines`);
   }
 
   await writeWorkspaceFile("compile/analytics.md", lines.join("\n") + "\n");

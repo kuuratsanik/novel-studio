@@ -10,6 +10,7 @@ import * as cmds from "./commands";
 import { StudioStatusBar } from "./services/statusBar";
 import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./services/automation";
 import { WikiLinkCompletionProvider, WikiLinkHoverProvider } from "./services/wikiProviders";
+import { scheduleEmbeddingRebuild } from "./services/embeddingScheduler";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -115,7 +116,10 @@ export function activate(context: vscode.ExtensionContext) {
       if (e.document.languageId === "markdown") auditIfAutomatic();
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (doc.languageId === "markdown") void auditIfAutomatic();
+      if (doc.languageId === "markdown") {
+        void auditIfAutomatic();
+        scheduleEmbeddingRebuild(doc);
+      }
     }),
   );
 

@@ -7,6 +7,7 @@ import { appendToCodex } from "./services/codexWriter";
 import { automationSettings } from "./services/automation";
 import { contractReady, currentDraftRel, loadContract, saveContract, SceneContract } from "./services/contracts";
 import { ensureSceneContract } from "./services/autoContract";
+import { getAnalyticsSnapshot } from "./services/analytics";
 
 export interface StudioHubDeps {
   keys: KeyManager;
@@ -107,6 +108,17 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             this._post({ type: "contractLoaded", contract: inferred, ready: contractReady(inferred), draft: rel });
             break;
           }
+          case "loadAnalytics": {
+            await this._sendAnalytics();
+            break;
+          }
+          case "refreshAnalyticsFile": {
+            const { writeAnalytics } = await import("./services/analytics");
+            await writeAnalytics();
+            await this._sendAnalytics();
+            this._post({ type: "status", busy: false, message: "Wrote compile/analytics.md" });
+            break;
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -118,6 +130,16 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
   private _post(payload: Record<string, unknown>) {
     this._view?.webview.postMessage(payload);
+  }
+
+  private async _sendAnalytics() {
+    try {
+      const snap = await getAnalyticsSnapshot();
+      this._post({ type: "analyticsLoaded", snapshot: snap });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this._post({ type: "analyticsLoaded", snapshot: null, message });
+    }
   }
 
   private async _sendContract() {
@@ -192,6 +214,11 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     .hub-section { display: none; }
     .hub-section.active { display: block; }
     #contractReady { font-size: 11px; margin-bottom: 6px; }
+    .metric { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--vscode-panel-border); }
+    .progress { height: 8px; background: var(--vscode-panel-border); border-radius: 4px; margin: 8px 0; overflow: hidden; }
+    .progress > span { display: block; height: 100%; background: var(--vscode-button-background); }
+    #chapterList { font-size: 11px; max-height: 180px; overflow-y: auto; }
+    #chapterList div { padding: 3px 0; }
   </style>
 </head>
 <body>
@@ -199,6 +226,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
   <div class="tabs">
     <button class="tab active" data-tab="tools">Tools</button>
     <button class="tab" data-tab="contract">Contract</button>
+    <button class="tab" data-tab="analytics">Analytics</button>
   </div>
 
   <section id="section-tools" class="hub-section active">
@@ -290,6 +318,18 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button id="btnSaveContract">Save contract</button>
   </section>
 
+  <section id="section-analytics" class="hub-section">
+    <p class="hint">Live stats from your workspace drafts and contracts.</p>
+    <div class="metric"><span>Total words</span><strong id="an_words">—</strong></div>
+    <div class="metric"><span>Target progress</span><strong id="an_progress">—</strong></div>
+    <div class="progress"><span id="an_bar" style="width:0%"></span></div>
+    <div class="metric"><span>Contracts ready</span><strong id="an_contracts">—</strong></div>
+    <div class="metric"><span>Chapters</span><strong id="an_chapters">—</strong></div>
+    <h3>Chapters</h3>
+    <div id="chapterList"></div>
+    <button id="btnRefreshAnalytics" class="btn-secondary">Write compile/analytics.md</button>
+  </section>
+
   <script>
     const vscode = acquireVsCodeApi();
     const selector = document.getElementById('toolSelector');
@@ -330,8 +370,11 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         tab.classList.add('active');
         document.getElementById('section-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'contract') vscode.postMessage({ type: 'loadContract' });
+        if (tab.dataset.tab === 'analytics') vscode.postMessage({ type: 'loadAnalytics' });
       });
     });
+
+    document.getElementById('btnRefreshAnalytics').addEventListener('click', () => vscode.postMessage({ type: 'refreshAnalyticsFile' }));
 
     function fillContract(c) {
       if (!c) return;
@@ -368,6 +411,17 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         document.getElementById('contractDraft').textContent = data.draft ? 'Contract for ' + data.draft : 'Open a drafts/*.md file.';
         document.getElementById('contractReady').textContent = data.ready ? '✓ Contract ready' : '✗ Contract incomplete';
         if (data.contract) fillContract(data.contract);
+      }
+      if (data.type === 'analyticsLoaded' && data.snapshot) {
+        const s = data.snapshot;
+        document.getElementById('an_words').textContent = s.totalWords.toLocaleString();
+        document.getElementById('an_progress').textContent = s.progressPct + '% of ' + s.wordTarget.toLocaleString();
+        document.getElementById('an_bar').style.width = Math.min(100, s.progressPct) + '%';
+        document.getElementById('an_contracts').textContent = s.contractsReady + '/' + s.draftCount;
+        document.getElementById('an_chapters').textContent = String(s.draftCount);
+        document.getElementById('chapterList').innerHTML = (s.chapters || []).map(c =>
+          '<div>' + c.rel.replace('drafts/', '') + ' — ' + c.words + 'w · ' + c.dialoguePct + '% dlg</div>'
+        ).join('') || '<div>No drafts yet.</div>';
       }
     });
     vscode.postMessage({ type: 'loadContract' });

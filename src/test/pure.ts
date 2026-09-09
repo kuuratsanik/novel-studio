@@ -3,6 +3,7 @@ import { DEFAULT_TEXT_MODELS, resolveTextModel } from "../services/modelDefaults
 import { auditContract } from "../services/contractAudit";
 import { cosineSimilarity, filterWordHits, overlapScore, wordCount } from "../services/proseStats";
 import { draftSortKey, parseFrontmatter } from "../services/frontmatter";
+import { epubCss } from "../services/epubThemes";
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -34,6 +35,8 @@ export function runPureTests(): void {
   assert(meta.order === "3", "frontmatter");
   assert(draftSortKey("drafts/ch10.md", "---\norder: 2\n---\n") < draftSortKey("drafts/ch11.md", ""), "sort key");
   assert(cosineSimilarity([1, 0], [1, 0]) === 1, "cosine identical");
+  assert(epubCss("serif").includes("Georgia"), "epub serif theme");
+  assert(epubCss("dark").includes("#121212"), "epub dark theme");
 }
 
 if (require.main === module) {

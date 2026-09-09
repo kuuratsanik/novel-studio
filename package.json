@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -120,6 +120,17 @@
           "type": "string",
           "default": "nomic-embed-text",
           "description": "Ollama embedding model for semantic retrieval."
+        },
+        "novelStudio.autoRebuildEmbeddings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Rebuild embedding index automatically after saving codex/draft/research files."
+        },
+        "novelStudio.epubTheme": {
+          "type": "string",
+          "default": "serif",
+          "enum": ["serif", "sans", "dark"],
+          "description": "Typography theme for EPUB export."
         }
       }
     },
@@ -213,11 +224,13 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node out/test/pure.js",
+    "test:integration": "npm run compile && node out/test/integration/run.js",
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.1",
     "typescript": "^5.5.0"
   }
 }
