@@ -8,6 +8,7 @@ import { loadPrompt, ensurePromptLibrary, listPrompts } from "./services/prompts
 import { logUsage } from "./services/usage";
 import { REVISION_MODES, RevisionMode } from "./services/revisionModes";
 import { formatDiff, wordDiff } from "./services/diffUtil";
+import { LOCAL_TEXT_PROVIDERS, resolveTextModel } from "./services/modelDefaults";
 
 export function selection(): string {
   const ed = vscode.window.activeTextEditor;
@@ -38,7 +39,7 @@ export async function pickRoute(keys: KeyManager): Promise<{ provider: string; m
   const defaultModel = cfg.get<string>("defaultModel") || "";
   const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
   if (forced && forced !== "auto") {
-    return { provider: forced, model: defaultModel || (forced === "ollama" ? "llama3.1" : "auto"), localUrl };
+    return { provider: forced, model: resolveTextModel(forced, defaultModel || "auto"), localUrl };
   }
   const hasCloud =
     (await keys.hasKey("openrouter")) ||
@@ -46,18 +47,24 @@ export async function pickRoute(keys: KeyManager): Promise<{ provider: string; m
     (await keys.hasKey("openai")) ||
     (await keys.hasKey("novelai"));
   if (offline || !hasCloud) {
-    return { provider: "ollama", model: defaultModel || "llama3.1", localUrl };
+    return { provider: "ollama", model: resolveTextModel("ollama", defaultModel || "auto"), localUrl };
   }
-  if (await keys.hasKey("anthropic")) return { provider: "anthropic", model: defaultModel || "auto", localUrl };
-  if (await keys.hasKey("openrouter")) return { provider: "openrouter", model: defaultModel || "auto", localUrl };
-  if (await keys.hasKey("openai")) return { provider: "openai", model: defaultModel || "auto", localUrl };
-  return { provider: "novelai", model: defaultModel || "kayra-v1", localUrl };
+  if (await keys.hasKey("anthropic")) {
+    return { provider: "anthropic", model: resolveTextModel("anthropic", defaultModel || "auto"), localUrl };
+  }
+  if (await keys.hasKey("openrouter")) {
+    return { provider: "openrouter", model: resolveTextModel("openrouter", defaultModel || "auto"), localUrl };
+  }
+  if (await keys.hasKey("openai")) {
+    return { provider: "openai", model: resolveTextModel("openai", defaultModel || "auto"), localUrl };
+  }
+  return { provider: "novelai", model: resolveTextModel("novelai", defaultModel || "auto"), localUrl };
 }
 
 export async function generatePacked(text: TextRouter, keys: KeyManager, prompt: string, systemPrompt: string) {
   const route = await pickRoute(keys);
   const privacy = vscode.workspace.getConfiguration("novelStudio").get<boolean>("privacyLocalCodex") ?? false;
-  const cloud = !["ollama", "kobold", "oobabooga", "tabby"].includes(route.provider);
+  const cloud = !LOCAL_TEXT_PROVIDERS.has(route.provider);
   const context = await packContext({
     prompt,
     selection: selection(),

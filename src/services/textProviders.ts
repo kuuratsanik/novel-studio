@@ -1,5 +1,6 @@
 import { KeyManager } from "./keyManager";
 import { NovelAiService } from "./novelAiService";
+import { resolveTextModel } from "./modelDefaults";
 
 export class TextRouter {
   constructor(private readonly keys: KeyManager, private readonly novelai: NovelAiService) {}
@@ -31,7 +32,7 @@ export class TextRouter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: opts.model && opts.model !== "auto" ? opts.model : "claude-sonnet-4-20250514",
+          model: resolveTextModel(provider, opts.model),
           max_tokens: 1024,
           messages: messages.filter((m) => m.role !== "system"),
           system: opts.systemPrompt,
@@ -56,14 +57,7 @@ export class TextRouter {
     if (conf.keyService) {
       headers.Authorization = `Bearer ${await this.keys.requireKey(conf.keyService, `${conf.keyService} key missing.`)}`;
     }
-    const model =
-      opts.model && opts.model !== "auto"
-        ? opts.model
-        : provider === "openrouter"
-          ? "anthropic/claude-sonnet-4"
-          : provider === "openai"
-            ? "gpt-4o-mini"
-            : "llama3.1";
+    const model = resolveTextModel(provider, opts.model);
     const res = await fetch(conf.url, {
       method: "POST",
       headers,

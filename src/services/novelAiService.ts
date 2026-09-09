@@ -1,3 +1,7 @@
+import { resolveTextModel } from "./modelDefaults";
+
+const NOVELAI_TEXT_API = "https://text.novelai.net/ai/generate";
+
 export class NovelAiService {
   constructor(private readonly getToken: () => Promise<string | undefined>) {}
 
@@ -5,12 +9,13 @@ export class NovelAiService {
     const token = await this.getToken();
     if (!token) throw new Error("NovelAI token missing. Run Novel Studio: Set NovelAI API Token.");
     const input = [opts.systemPrompt, opts.context, opts.prompt].filter(Boolean).join("\n\n");
-    const res = await fetch("https://api.novelai.net/ai/generate", {
+    const model = resolveTextModel("novelai", opts.model);
+    const res = await fetch(NOVELAI_TEXT_API, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         input,
-        model: opts.model || "kayra-v1",
+        model,
         parameters: { temperature: 0.8, max_length: 400, min_length: 1 },
       }),
     });

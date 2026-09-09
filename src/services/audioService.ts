@@ -1,5 +1,6 @@
 import { KeyManager } from "./keyManager";
 import { writeWorkspaceFile } from "./workspaceIo";
+import { DEFAULT_AUDIO_MODELS } from "./modelDefaults";
 
 export class AudioService {
   constructor(private readonly keys: KeyManager) {}
@@ -21,7 +22,7 @@ export class AudioService {
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "xi-api-key": key, Accept: "audio/mpeg" },
-      body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }),
+      body: JSON.stringify({ text, model_id: DEFAULT_AUDIO_MODELS.elevenlabs }),
     });
     if (!response.ok) throw new Error(`ElevenLabs ${response.status}: ${(await response.text()).slice(0, 300)}`);
     return Buffer.from(await response.arrayBuffer());
@@ -32,7 +33,7 @@ export class AudioService {
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: "gpt-4o-mini-tts", voice, input: text }),
+      body: JSON.stringify({ model: DEFAULT_AUDIO_MODELS.openai, voice, input: text }),
     });
     if (!response.ok) throw new Error(`OpenAI TTS ${response.status}: ${(await response.text()).slice(0, 300)}`);
     return Buffer.from(await response.arrayBuffer());
