@@ -10,7 +10,7 @@ Repo: https://github.com/kuuratsanik/novel-studio
 
 **Fastest — no compile.** Use the packaged VSIX:
 
-1. Download `novel-studio-1.0.0.vsix` from the Novel Studio web desk **Export** tab (or from GitHub Actions **Package** artifacts after a main-branch run).
+1. Download the `novel-studio-vsix` artifact from the most recent [**Package** workflow run](https://github.com/kuuratsanik/novel-studio/actions/workflows/package.yml) and unzip it to get `novel-studio-1.0.0.vsix`.
 2. In VS Code press `Ctrl+Shift+P` → **Extensions: Install from VSIX…** → pick that file.
 3. Reload the window when asked.
 4. Click the Novel Studio book icon in the Activity Bar.
@@ -35,11 +35,17 @@ Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity au
 ```bash
 git clone https://github.com/kuuratsanik/novel-studio.git
 cd novel-studio
-npm install
-npm run compile
-npx @vscode/vsce package --allow-missing-repository
+npm ci
+npm run verify   # eslint + unit tests
+npm run package
 code --install-extension novel-studio-1.0.0.vsix
 ```
+
+`npm run verify` runs ESLint and the unit suite in `src/test/*.test.ts`. Those
+tests cover `src/core/`, which holds the logic that does not depend on the
+`vscode` API, so they run in plain Node without launching an editor.
+
+Planned and outstanding work is tracked in [UPGRADES.md](UPGRADES.md).
 
 ## Marketplace
 
