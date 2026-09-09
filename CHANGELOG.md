@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0
+
+- Studio Hub **Contract** tab: edit, auto-infer, and save scene contracts in the sidebar.
+- Semantic RAG via Ollama `nomic-embed-text` (hybrid with keyword wiki RAG).
+- **Rebuild Embedding Index** command stores vectors in `.novel-studio/embeddings.json`.
+- **Export EPUB** builds a valid EPUB from drafts (`zip` required).
+- **Compare Snapshot to Trunk** opens a diff editor for branch snapshots.
+
 ## 1.2.0
 
 - Stream local generation into the editor (`novelStudio.streamGeneration`).

@@ -83,6 +83,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.pickModel", wrap(() => cmds.pickModelCmd(keyManager))),
     vscode.commands.registerCommand("novelStudio.brokenLinks", wrap(() => cmds.brokenLinksCmd())),
     vscode.commands.registerCommand("novelStudio.wikiIndex", wrap(() => cmds.wikiIndexCmd())),
+    vscode.commands.registerCommand("novelStudio.rebuildEmbeddings", wrap(() => cmds.rebuildEmbeddingsCmd())),
+    vscode.commands.registerCommand("novelStudio.exportEpub", wrap(() => cmds.exportEpubCmd())),
+    vscode.commands.registerCommand("novelStudio.compareSnapshot", wrap(() => cmds.compareSnapshotCmd())),
     vscode.commands.registerCommand("novelStudio.narrateChapter", wrap(async () => {
       const src = cmds.selection() || cmds.activeText();
       const rel = await audio.speak(src.slice(0, 4000), "openai");

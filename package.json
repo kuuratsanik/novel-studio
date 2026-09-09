@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -110,6 +110,16 @@
           "type": "number",
           "default": 1024,
           "description": "Maximum tokens per generation request."
+        },
+        "novelStudio.embeddingRag": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use Ollama embeddings (nomic-embed-text) for semantic RAG when indexed."
+        },
+        "novelStudio.embeddingModel": {
+          "type": "string",
+          "default": "nomic-embed-text",
+          "description": "Ollama embedding model for semantic retrieval."
         }
       }
     },
@@ -192,7 +202,10 @@
       { "command": "novelStudio.runUnitTests", "title": "Novel Studio: Run Unit Tests" },
       { "command": "novelStudio.pickModel", "title": "Novel Studio: Pick Local Model" },
       { "command": "novelStudio.brokenLinks", "title": "Novel Studio: Check Broken Wiki Links" },
-      { "command": "novelStudio.wikiIndex", "title": "Novel Studio: Build Wiki Index" }
+      { "command": "novelStudio.wikiIndex", "title": "Novel Studio: Build Wiki Index" },
+      { "command": "novelStudio.rebuildEmbeddings", "title": "Novel Studio: Rebuild Embedding Index" },
+      { "command": "novelStudio.exportEpub", "title": "Novel Studio: Export EPUB" },
+      { "command": "novelStudio.compareSnapshot", "title": "Novel Studio: Compare Snapshot to Trunk" }
     ]
   },
   "scripts": {

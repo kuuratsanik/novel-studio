@@ -1,7 +1,7 @@
 import { wordDiff } from "../services/diffUtil";
 import { DEFAULT_TEXT_MODELS, resolveTextModel } from "../services/modelDefaults";
 import { auditContract } from "../services/contractAudit";
-import { filterWordHits, overlapScore, wordCount } from "../services/proseStats";
+import { cosineSimilarity, filterWordHits, overlapScore, wordCount } from "../services/proseStats";
 import { draftSortKey, parseFrontmatter } from "../services/frontmatter";
 
 function assert(cond: unknown, msg: string) {
@@ -33,6 +33,7 @@ export function runPureTests(): void {
   const { meta } = parseFrontmatter("---\norder: 3\n---\n\n# Hi");
   assert(meta.order === "3", "frontmatter");
   assert(draftSortKey("drafts/ch10.md", "---\norder: 2\n---\n") < draftSortKey("drafts/ch11.md", ""), "sort key");
+  assert(cosineSimilarity([1, 0], [1, 0]) === 1, "cosine identical");
 }
 
 if (require.main === module) {

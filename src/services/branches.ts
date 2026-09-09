@@ -14,6 +14,31 @@ export async function snapshotBranch(label?: string): Promise<string> {
   return dest;
 }
 
+export async function compareSnapshot(): Promise<void> {
+  const root = workspaceRoot();
+  const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "branches/**/*.md"));
+  if (!files.length) throw new Error("No branches/ snapshots yet.");
+  const pick = await vscode.window.showQuickPick(
+    files.map((f) => path.relative(root, f.fsPath).replace(/\\/g, "/")),
+    { title: "Compare which snapshot to its trunk?" },
+  );
+  if (!pick) return;
+  const text = await readWorkspaceFile(pick);
+  const trunkRel = text.match(/<!-- trunk:\s*(.+?)\s*-->/)?.[1] || currentDraftRel();
+  if (!trunkRel) throw new Error("Snapshot is missing trunk reference.");
+  const snapBody = text.replace(/<!-- trunk:[\s\S]*?-->\n?/, "");
+  const tempRel = `compile/.diff-${Date.now()}.md`;
+  await writeWorkspaceFile(tempRel, snapBody);
+  const trunkUri = vscode.Uri.file(path.join(root, trunkRel));
+  const snapUri = vscode.Uri.file(path.join(root, tempRel));
+  await vscode.commands.executeCommand(
+    "vscode.diff",
+    trunkUri,
+    snapUri,
+    `${path.basename(trunkRel)} ↔ ${path.basename(pick)}`,
+  );
+}
+
 export async function mergeBranch(): Promise<string> {
   const root = workspaceRoot();
   const files = await vscode.workspace.findFiles(new vscode.RelativePattern(root, "branches/**/*.md"));

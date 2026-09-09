@@ -27,6 +27,19 @@ export function dialogueRatio(text: string): number {
   return dialogue / lines.length;
 }
 
+export function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (!na || !nb) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
 export function overlapScore(a: string, b: string): number {
   const wa = new Set(a.toLowerCase().split(/\s+/).filter((w) => w.length > 3));
   const wb = new Set(b.toLowerCase().split(/\s+/).filter((w) => w.length > 3));

@@ -1,8 +1,10 @@
 import { loadBible, bibleLockPrompt } from "./bible";
 import { loadState, statePrompt } from "./stateMachine";
 import { loadContract, contractPrompt, currentDraftRel } from "./contracts";
+import * as vscode from "vscode";
 import { buildWikiIndex } from "./wikiIndex";
 import { listMarkdown } from "./workspaceIo";
+import { retrieveEmbeddingContext } from "./embeddings";
 
 export async function packContext(opts: {
   prompt: string;
@@ -16,7 +18,16 @@ export async function packContext(opts: {
 }): Promise<string> {
   const chunks: string[] = [];
   if (opts.useRag) {
-    chunks.push(await retrieveRagContext(opts.prompt, opts.selection));
+    const keyword = await retrieveRagContext(opts.prompt, opts.selection);
+    if (keyword) chunks.push(keyword);
+    const useEmbeddings = vscode.workspace.getConfiguration("novelStudio").get<boolean>("embeddingRag") ?? true;
+    if (useEmbeddings) {
+      const embedded = await retrieveEmbeddingContext(
+        `${opts.prompt}\n${opts.selection}`,
+        opts.ollamaUrl,
+      ).catch(() => "");
+      if (embedded) chunks.push(embedded);
+    }
   }
   if (opts.useBible) {
     const bible = await loadBible();

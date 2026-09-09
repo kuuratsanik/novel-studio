@@ -40,6 +40,13 @@ export async function loadContract(draftRel: string): Promise<{ rel: string; con
   }
 }
 
+export async function saveContract(draftRel: string, contract: SceneContract): Promise<string> {
+  const dest = contractPath(draftRel);
+  contract.complete = !!(contract.goal && contract.conflict && contract.turn && contract.exit);
+  await writeWorkspaceFile(dest, JSON.stringify(contract, null, 2) + "\n");
+  return dest;
+}
+
 export async function seedContract(draftRel?: string): Promise<string> {
   const rel = draftRel || currentDraftRel() || "drafts/ch01.md";
   const dest = contractPath(rel);

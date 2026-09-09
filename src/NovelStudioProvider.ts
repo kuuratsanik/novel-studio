@@ -5,6 +5,8 @@ import { TextRouter } from "./services/textProviders";
 import { generateFromTool, StudioTool } from "./services/studioHub";
 import { appendToCodex } from "./services/codexWriter";
 import { automationSettings } from "./services/automation";
+import { contractReady, currentDraftRel, loadContract, saveContract, SceneContract } from "./services/contracts";
+import { ensureSceneContract } from "./services/autoContract";
 
 export interface StudioHubDeps {
   keys: KeyManager;
@@ -32,6 +34,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
     webviewView.webview.html = this._getHtmlForWebview();
+    void this._sendContract();
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       try {
@@ -72,6 +75,38 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             vscode.window.showInformationMessage(`Saved to codex/${data.filename}`);
             break;
           }
+          case "loadContract": {
+            await this._sendContract();
+            break;
+          }
+          case "saveContract": {
+            const rel = currentDraftRel();
+            if (!rel) throw new Error("Open a drafts/*.md file to save its contract.");
+            const contract: SceneContract = {
+              goal: String(data.goal || ""),
+              conflict: String(data.conflict || ""),
+              turn: String(data.turn || ""),
+              exit: String(data.exit || ""),
+              mustInclude: String(data.mustInclude || "")
+                .split(",")
+                .map((s: string) => s.trim())
+                .filter(Boolean),
+              mustNot: String(data.mustNot || "")
+                .split(",")
+                .map((s: string) => s.trim())
+                .filter(Boolean),
+            };
+            await saveContract(rel, contract);
+            this._post({ type: "contractSaved", ready: contractReady(contract), message: "Contract saved." });
+            break;
+          }
+          case "inferContract": {
+            const rel = currentDraftRel();
+            if (!rel) throw new Error("Open a draft chapter first.");
+            const inferred = await ensureSceneContract(rel);
+            this._post({ type: "contractLoaded", contract: inferred, ready: contractReady(inferred), draft: rel });
+            break;
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -83,6 +118,17 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
   private _post(payload: Record<string, unknown>) {
     this._view?.webview.postMessage(payload);
+  }
+
+  private async _sendContract() {
+    const rel = currentDraftRel();
+    if (!rel) {
+      this._post({ type: "contractLoaded", contract: null, ready: false, draft: "" });
+      return;
+    }
+    const loaded = await loadContract(rel);
+    const contract = loaded?.contract || (await ensureSceneContract(rel));
+    this._post({ type: "contractLoaded", contract, ready: contractReady(contract), draft: rel });
   }
 
   private async _insertProse(text: string) {
@@ -140,10 +186,22 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     #status { font-size: 11px; min-height: 1.2em; margin: 6px 0; color: var(--vscode-descriptionForeground); }
     #status.error { color: var(--vscode-errorForeground); }
     .hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+    .tab { flex: 1; padding: 6px; border: 1px solid var(--vscode-panel-border); background: var(--vscode-button-secondaryBackground); cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
+    .tab.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    .hub-section { display: none; }
+    .hub-section.active { display: block; }
+    #contractReady { font-size: 11px; margin-bottom: 6px; }
   </style>
 </head>
 <body>
   <span class="badge">${modeLabel} mode</span>
+  <div class="tabs">
+    <button class="tab active" data-tab="tools">Tools</button>
+    <button class="tab" data-tab="contract">Contract</button>
+  </div>
+
+  <section id="section-tools" class="hub-section active">
   <p class="hint">Fill a tool, click Generate. Output is written to your draft or codex automatically.</p>
 
   <label>Writing Tool</label>
@@ -217,6 +275,20 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
   <h3>Output</h3>
   <textarea id="rawOutput" rows="6" placeholder="Generated prose appears here…" readonly></textarea>
   <button class="btn-secondary" id="btnRouteAction">Re-route Output Manually</button>
+  </section>
+
+  <section id="section-contract" class="hub-section">
+    <p class="hint" id="contractDraft">Open a drafts/*.md file to edit its scene contract.</p>
+    <div id="contractReady"></div>
+    <label>Goal</label><textarea id="ct_goal" rows="2"></textarea>
+    <label>Conflict</label><textarea id="ct_conflict" rows="2"></textarea>
+    <label>Turn</label><textarea id="ct_turn" rows="2"></textarea>
+    <label>Exit</label><textarea id="ct_exit" rows="2"></textarea>
+    <label>Must include (comma-separated)</label><input id="ct_mustInclude" />
+    <label>Must not (comma-separated)</label><input id="ct_mustNot" />
+    <button id="btnInferContract" class="btn-secondary">Auto-infer from draft</button>
+    <button id="btnSaveContract">Save contract</button>
+  </section>
 
   <script>
     const vscode = acquireVsCodeApi();
@@ -251,6 +323,39 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       vscode.postMessage({ type: 'routeOutput', tool: selector.value, fields: fieldsForTool(selector.value), text });
     });
 
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.hub-section').forEach(s => s.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('section-' + tab.dataset.tab).classList.add('active');
+        if (tab.dataset.tab === 'contract') vscode.postMessage({ type: 'loadContract' });
+      });
+    });
+
+    function fillContract(c) {
+      if (!c) return;
+      document.getElementById('ct_goal').value = c.goal || '';
+      document.getElementById('ct_conflict').value = c.conflict || '';
+      document.getElementById('ct_turn').value = c.turn || '';
+      document.getElementById('ct_exit').value = c.exit || '';
+      document.getElementById('ct_mustInclude').value = (c.mustInclude || []).join(', ');
+      document.getElementById('ct_mustNot').value = (c.mustNot || []).join(', ');
+    }
+
+    document.getElementById('btnSaveContract').addEventListener('click', () => {
+      vscode.postMessage({
+        type: 'saveContract',
+        goal: document.getElementById('ct_goal').value,
+        conflict: document.getElementById('ct_conflict').value,
+        turn: document.getElementById('ct_turn').value,
+        exit: document.getElementById('ct_exit').value,
+        mustInclude: document.getElementById('ct_mustInclude').value,
+        mustNot: document.getElementById('ct_mustNot').value,
+      });
+    });
+    document.getElementById('btnInferContract').addEventListener('click', () => vscode.postMessage({ type: 'inferContract' }));
+
     window.addEventListener('message', (event) => {
       const data = event.data;
       if (data.type === 'status' || data.type === 'generated') {
@@ -259,7 +364,13 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         btnGenerate.disabled = !!data.busy;
         if (data.text) outputEl.value = data.text;
       }
+      if (data.type === 'contractLoaded' || data.type === 'contractSaved') {
+        document.getElementById('contractDraft').textContent = data.draft ? 'Contract for ' + data.draft : 'Open a drafts/*.md file.';
+        document.getElementById('contractReady').textContent = data.ready ? '✓ Contract ready' : '✗ Contract incomplete';
+        if (data.contract) fillContract(data.contract);
+      }
     });
+    vscode.postMessage({ type: 'loadContract' });
   </script>
 </body>
 </html>`;

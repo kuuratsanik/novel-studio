@@ -246,6 +246,23 @@ export async function wikiIndexCmd() {
   vscode.window.showInformationMessage("Wrote compile/wiki-index.md");
 }
 
+export async function rebuildEmbeddingsCmd() {
+  const localUrl = vscode.workspace.getConfiguration("novelStudio").get<string>("localTextUrl") || "http://127.0.0.1:11434";
+  const { rebuildEmbeddings } = await import("./services/embeddings");
+  const n = await rebuildEmbeddings(localUrl);
+  vscode.window.showInformationMessage(`Indexed ${n} embedding chunk(s) to .novel-studio/embeddings.json`);
+}
+
+export async function exportEpubCmd() {
+  const { exportEpub } = await import("./services/epubExport");
+  vscode.window.showInformationMessage(`EPUB: ${await exportEpub()}`);
+}
+
+export async function compareSnapshotCmd() {
+  const { compareSnapshot } = await import("./services/branches");
+  await compareSnapshot();
+}
+
 export async function seedState() {
   const { seedStateFromCodex } = await import("./services/stateMachine");
   const state = await seedStateFromCodex();
