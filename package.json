@@ -34,7 +34,6 @@
       "supported": false
     }
   },
-  "files": ["out", "media", "resources", "LICENSE", "README.md", "CHANGELOG.md"],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
