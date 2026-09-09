@@ -19,6 +19,17 @@ Repo: https://github.com/kuuratsanik/novel-studio
 
 Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity audit, `Ctrl+Alt+D` diff rewrite, `Ctrl+Alt+S` snapshot.
 
+## Automatic mode (default)
+
+Novel Studio runs end-to-end without copy/paste:
+
+1. Open a folder — workspace files bootstrap automatically if missing.
+2. Open the Studio Hub, fill a tool, click **Generate & Route Automatically**.
+3. Prose lands in your draft or codex; state patches apply; continuity audits run on save.
+4. `Ctrl+Alt+N` continues the scene (contracts auto-infer from frontmatter when empty).
+
+Use `novelStudio.fullyAutomatic: false` in settings to restore confirmation prompts.
+
 ## Routing
 
 | Tool | Destination |

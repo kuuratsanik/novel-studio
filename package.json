@@ -186,6 +186,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node out/test/pure.js",
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "devDependencies": {
