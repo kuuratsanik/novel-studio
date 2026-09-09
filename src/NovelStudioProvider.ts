@@ -1,43 +1,54 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { KeyManager } from "./services/keyManager";
-import { ContinuityDiagnostics } from "./services/diagnostics";
+
+/** Codex files the webview is allowed to append to. */
+const CODEX_FILES = new Set(["characters.md", "world_lore.md", "items.md", "plot_ideas.md"]);
+
+/** Hosts the webview is allowed to open externally. */
+const ALLOWED_HOSTS = new Set(["toolsaday.com", "www.toolsaday.com"]);
+
+function nonce(): string {
+  let text = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) text += chars.charAt(Math.floor(Math.random() * chars.length));
+  return text;
+}
 
 export class NovelStudioProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "novelStudio.sidebar";
-  private _view?: vscode.WebviewView;
 
-  constructor(
-    private readonly _extensionUri: vscode.Uri,
-    private readonly _keys?: KeyManager,
-    private readonly _diagnostics?: ContinuityDiagnostics,
-  ) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ) {
-    this._view = webviewView;
-
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
 
-    webviewView.webview.html = this._getHtmlForWebview();
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.type) {
         case "copyPrompt": {
+          if (typeof data.text !== "string" || !data.text.trim()) {
+            vscode.window.showWarningMessage("Fill in at least one field first.");
+            break;
+          }
           await vscode.env.clipboard.writeText(data.text);
-          vscode.window.showInformationMessage(
-            `${data.toolName} prompt copied to clipboard!`,
-          );
+          vscode.window.showInformationMessage(`${String(data.toolName)} prompt copied.`);
           break;
         }
         case "openToolUrl": {
-          vscode.env.openExternal(vscode.Uri.parse(data.url));
+          const url = this._safeExternalUrl(data.url);
+          if (!url) {
+            vscode.window.showErrorMessage("Refused to open an unexpected URL.");
+            break;
+          }
+          void vscode.env.openExternal(url);
           break;
         }
         case "insertProse": {
@@ -83,11 +94,28 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private _safeExternalUrl(raw: unknown): vscode.Uri | undefined {
+    if (typeof raw !== "string") return undefined;
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== "https:") return undefined;
+      if (!ALLOWED_HOSTS.has(parsed.hostname)) return undefined;
+      return vscode.Uri.parse(parsed.toString());
+    } catch {
+      return undefined;
+    }
+  }
+
   private async _appendToCodexFile(
     filename: string,
     header: string,
     content: string,
   ) {
+    if (!CODEX_FILES.has(filename)) {
+      vscode.window.showErrorMessage(`Refused to write to codex/${filename}.`);
+      return;
+    }
+
     const folders = vscode.workspace.workspaceFolders;
     if (!folders) {
       vscode.window.showErrorMessage("Please open a workspace folder first.");
@@ -125,13 +153,21 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _getHtmlForWebview(): string {
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const n = nonce();
+    const csp = [
+      `default-src 'none'`,
+      `img-src ${webview.cspSource} data:`,
+      `style-src 'nonce-${n}'`,
+      `script-src 'nonce-${n}'`,
+    ].join("; ");
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta http-equiv="Content-Security-Policy" content="${csp}">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
+      <style nonce="${n}">
         body { font-family: var(--vscode-font-family); padding: 10px; color: var(--vscode-foreground); }
         label { font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 8px; display: block; }
         textarea, input, select { width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 6px; margin-bottom: 6px; border-radius: 2px; }
@@ -236,7 +272,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
       <button id="btnRouteAction">Insert into Scene</button>
 
-      <script>
+      <script nonce="${n}">
         const vscode = acquireVsCodeApi();
 
         const toolUrls = {
