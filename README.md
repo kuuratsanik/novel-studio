@@ -30,7 +30,9 @@ Novel Studio runs end-to-end without copy/paste:
 
 Use `novelStudio.fullyAutomatic: false` in settings to restore confirmation prompts.
 
-Additional automation in v1.2: streaming local generation, wiki `[[link]]` autocomplete, contract violation audits, outline→draft sync, and richer compile/analytics reports.
+Additional automation in v1.2+: streaming local generation, wiki `[[link]]` autocomplete, contract violation audits, outline→draft sync, and richer compile/analytics reports.
+
+v1.3 adds a **Contract** tab in Studio Hub, semantic embedding RAG (`ollama pull nomic-embed-text`), EPUB export, and snapshot diff view.
 
 ## Routing
 
