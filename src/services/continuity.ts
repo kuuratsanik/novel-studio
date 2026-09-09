@@ -1,5 +1,7 @@
 import { loadBible, unknownNames } from "./bible";
 import { loadState } from "./stateMachine";
+import { currentDraftRel, loadContract } from "./contracts";
+import { auditContract } from "./contractAudit";
 
 export interface ContinuityFlag {
   message: string;
@@ -28,6 +30,15 @@ export async function auditProse(prose: string): Promise<ContinuityFlag[]> {
           severity: "warning",
           matchText: m[0],
         });
+      }
+    }
+  }
+  const rel = currentDraftRel();
+  if (rel) {
+    const loaded = await loadContract(rel);
+    if (loaded) {
+      for (const f of auditContract(prose, loaded.contract)) {
+        flags.push({ message: f.message, severity: "warning", matchText: f.matchText });
       }
     }
   }

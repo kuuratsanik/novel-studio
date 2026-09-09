@@ -1,6 +1,11 @@
+import * as vscode from "vscode";
 import { KeyManager } from "./keyManager";
 import { NovelAiService } from "./novelAiService";
 import { resolveTextModel } from "./modelDefaults";
+
+function maxTokens(): number {
+  return vscode.workspace.getConfiguration("novelStudio").get<number>("maxTokens") ?? 1024;
+}
 
 export class TextRouter {
   constructor(private readonly keys: KeyManager, private readonly novelai: NovelAiService) {}
@@ -12,11 +17,16 @@ export class TextRouter {
     prompt: string;
     systemPrompt?: string;
     context?: string;
+    stream?: boolean;
+    onToken?: (chunk: string) => void;
   }): Promise<string> {
     const provider = opts.provider || "ollama";
     if (provider === "novelai") {
-      return this.novelai.generateText(opts);
+      const out = await this.novelai.generateText(opts);
+      opts.onToken?.(out);
+      return out;
     }
+
     const messages = [
       opts.systemPrompt ? { role: "system", content: opts.systemPrompt } : undefined,
       { role: "user", content: [opts.context, opts.prompt].filter(Boolean).join("\n\n") },
@@ -33,14 +43,16 @@ export class TextRouter {
         },
         body: JSON.stringify({
           model: resolveTextModel(provider, opts.model),
-          max_tokens: 1024,
+          max_tokens: maxTokens(),
           messages: messages.filter((m) => m.role !== "system"),
           system: opts.systemPrompt,
         }),
       });
       const data = (await res.json()) as { content?: { text?: string }[]; error?: { message?: string } };
       if (!res.ok) throw new Error(data.error?.message || `Anthropic ${res.status}`);
-      return (data.content || []).map((c) => c.text || "").join("").trim();
+      const out = (data.content || []).map((c) => c.text || "").join("").trim();
+      opts.onToken?.(out);
+      return out;
     }
 
     const openAiCompat: Record<string, { url: string; keyService?: string }> = {
@@ -58,16 +70,60 @@ export class TextRouter {
       headers.Authorization = `Bearer ${await this.keys.requireKey(conf.keyService, `${conf.keyService} key missing.`)}`;
     }
     const model = resolveTextModel(provider, opts.model);
-    const res = await fetch(conf.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ model, messages, temperature: 0.8 }),
-    });
+    const body = { model, messages, temperature: 0.8, max_tokens: maxTokens(), stream: !!opts.stream };
+
+    if (opts.stream && opts.onToken) {
+      return this.streamOpenAi(conf.url, headers, body, opts.onToken);
+    }
+
+    const res = await fetch(conf.url, { method: "POST", headers, body: JSON.stringify(body) });
     const raw = await res.text();
     if (!res.ok) throw new Error(`${provider} ${res.status}: ${raw.slice(0, 300)}`);
     const data = JSON.parse(raw) as { choices?: { message?: { content?: string } }[] };
     const out = data.choices?.[0]?.message?.content || "";
     if (!out.trim()) throw new Error(`${provider} returned empty text.`);
     return out.trim();
+  }
+
+  private async streamOpenAi(
+    url: string,
+    headers: Record<string, string>,
+    body: Record<string, unknown>,
+    onToken: (chunk: string) => void,
+  ): Promise<string> {
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(`stream ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.body) throw new Error("stream body missing");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let full = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
+          const chunk = json.choices?.[0]?.delta?.content || "";
+          if (chunk) {
+            full += chunk;
+            onToken(chunk);
+          }
+        } catch {
+          // skip malformed chunks
+        }
+      }
+    }
+    if (!full.trim()) throw new Error("stream returned empty text");
+    return full.trim();
   }
 }

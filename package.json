@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -100,6 +100,16 @@
           "type": "boolean",
           "default": false,
           "description": "Do not send series bible or RAG context to cloud providers."
+        },
+        "novelStudio.streamGeneration": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stream local model tokens into the editor while generating."
+        },
+        "novelStudio.maxTokens": {
+          "type": "number",
+          "default": 1024,
+          "description": "Maximum tokens per generation request."
         }
       }
     },
@@ -179,7 +189,10 @@
       { "command": "novelStudio.importDocx", "title": "Novel Studio: Import Word Document" },
       { "command": "novelStudio.archiveProject", "title": "Novel Studio: Archive Project" },
       { "command": "novelStudio.applyStatePatch", "title": "Novel Studio: Propose State Patches" },
-      { "command": "novelStudio.runUnitTests", "title": "Novel Studio: Run Unit Tests" }
+      { "command": "novelStudio.runUnitTests", "title": "Novel Studio: Run Unit Tests" },
+      { "command": "novelStudio.pickModel", "title": "Novel Studio: Pick Local Model" },
+      { "command": "novelStudio.brokenLinks", "title": "Novel Studio: Check Broken Wiki Links" },
+      { "command": "novelStudio.wikiIndex", "title": "Novel Studio: Build Wiki Index" }
     ]
   },
   "scripts": {

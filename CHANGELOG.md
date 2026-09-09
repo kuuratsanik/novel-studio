@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+- Stream local generation into the editor (`novelStudio.streamGeneration`).
+- Contract mustInclude/mustNot audits in continuity diagnostics.
+- Wiki `[[link]]` autocomplete and hover; broken-link report command.
+- Outline sync creates missing chapter drafts + contracts from beats.
+- Richer eval, analytics, read-aloud QA, compile TOC, and LoRA export format.
+- Pick local Ollama model command; polish prompt distinct from expand.
+- Multi-agent adds continuity pass when fully automatic.
+
 ## 1.1.0
 
 - Fully automatic mode (default): Studio Hub generates and routes output without copy/paste.

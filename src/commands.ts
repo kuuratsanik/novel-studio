@@ -67,9 +67,16 @@ export async function pickRoute(keys: KeyManager): Promise<{ provider: string; m
   return { provider: "novelai", model: resolveTextModel("novelai", defaultModel || "auto"), localUrl };
 }
 
-export async function generatePacked(text: TextRouter, keys: KeyManager, prompt: string, systemPrompt: string) {
+export async function generatePacked(
+  text: TextRouter,
+  keys: KeyManager,
+  prompt: string,
+  systemPrompt: string,
+  onToken?: (chunk: string) => void,
+) {
   const route = await pickRoute(keys);
   const privacy = vscode.workspace.getConfiguration("novelStudio").get<boolean>("privacyLocalCodex") ?? false;
+  const stream = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
   const cloud = !LOCAL_TEXT_PROVIDERS.has(route.provider);
   const context = await packContext({
     prompt,
@@ -88,6 +95,8 @@ export async function generatePacked(text: TextRouter, keys: KeyManager, prompt:
     prompt,
     systemPrompt,
     context,
+    stream: stream && !!onToken && LOCAL_TEXT_PROVIDERS.has(route.provider),
+    onToken,
   });
   await logUsage({
     provider: route.provider,
@@ -104,8 +113,20 @@ export async function continueScene(text: TextRouter, keys: KeyManager, diagnost
   if (rel) await ensureSceneContract(rel);
   const sys = await loadPrompt("continue");
   const prompt = selection() || activeText().slice(-1800) || "Open the next beat.";
-  const out = await generatePacked(text, keys, prompt, sys);
-  insert(out);
+
+  const ed = vscode.window.activeTextEditor;
+  const streamOn = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
+  let out: string;
+  if (streamOn && ed) {
+    const { StreamInserter } = await import("./services/streamInserter");
+    const sink = new StreamInserter(ed);
+    await sink.begin();
+    out = await generatePacked(text, keys, prompt, sys, (chunk) => void sink.push(chunk));
+    out = await sink.finish();
+  } else {
+    out = await generatePacked(text, keys, prompt, sys);
+    insert(out);
+  }
   const { reviewAndApply } = await import("./services/statePatch");
   const msg = await reviewAndApply(out);
   const auto = automationSettings();
@@ -140,7 +161,11 @@ export async function multiAgent(text: TextRouter, keys: KeyManager) {
   const src = selection() || activeText().slice(-2000);
   const draft = await generatePacked(text, keys, src, "Role: writer. Continue the scene.");
   const edited = await generatePacked(text, keys, draft, "Role: editor. Tighten only.");
-  insert(edited);
+  const auto = automationSettings();
+  const final = auto.fullyAutomatic
+    ? await generatePacked(text, keys, edited, await loadPrompt("continuity"))
+    : edited;
+  insert(final);
 }
 
 export async function runAudit(diagnostics: ContinuityDiagnostics) {
@@ -179,11 +204,46 @@ export async function seedStudioFiles() {
 }
 
 export async function revisionPass(text: TextRouter, keys: KeyManager) {
-  const mode = (await vscode.window.showQuickPick(Object.keys(REVISION_MODES))) as RevisionMode | undefined;
+  const auto = automationSettings();
+  let mode = (await vscode.window.showQuickPick(Object.keys(REVISION_MODES))) as RevisionMode | undefined;
+  if (!mode && auto.fullyAutomatic) mode = "cut10";
   if (!mode) return;
   const src = selection() || activeText();
   const out = await generatePacked(text, keys, src, REVISION_MODES[mode]);
   insert(`<!-- ${mode} -->\n${out}`);
+}
+
+export async function polishSelectionCmd(text: TextRouter, keys: KeyManager) {
+  const src = selection();
+  if (!src) throw new Error("Select prose to polish.");
+  const out = await generatePacked(text, keys, src, await loadPrompt("polish"));
+  replaceSel(out);
+}
+
+export async function pickModelCmd(keys: KeyManager) {
+  const cfg = vscode.workspace.getConfiguration("novelStudio");
+  const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
+  const { listOllamaModels } = await import("./services/ollamaDiscovery");
+  const models = await listOllamaModels(localUrl);
+  const pick = await vscode.window.showQuickPick(models.length ? models : ["qwen2.5:32b-instruct"], {
+    title: "Local model",
+  });
+  if (!pick) return;
+  await cfg.update("defaultModel", pick, vscode.ConfigurationTarget.Workspace);
+  vscode.window.showInformationMessage(`Default model set to ${pick}`);
+}
+
+export async function brokenLinksCmd() {
+  const { writeBrokenLinkReport } = await import("./services/brokenLinks");
+  vscode.window.showInformationMessage(await writeBrokenLinkReport());
+}
+
+export async function wikiIndexCmd() {
+  const { buildWikiIndex } = await import("./services/wikiIndex");
+  const { writeWorkspaceFile } = await import("./services/workspaceIo");
+  const { report } = await buildWikiIndex();
+  await writeWorkspaceFile("compile/wiki-index.md", `# Wiki index\n\n${report}\n`);
+  vscode.window.showInformationMessage("Wrote compile/wiki-index.md");
 }
 
 export async function seedState() {

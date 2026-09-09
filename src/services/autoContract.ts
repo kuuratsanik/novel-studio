@@ -1,16 +1,6 @@
 import { contractPath, contractReady, loadContract, SceneContract, seedContract } from "./contracts";
 import { readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
-
-function parseFrontmatter(text: string): Record<string, string> {
-  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return {};
-  const out: Record<string, string> = {};
-  for (const line of m[1].split(/\r?\n/)) {
-    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.+)$/);
-    if (kv) out[kv[1]] = kv[2].trim();
-  }
-  return out;
-}
+import { parseFrontmatter } from "./frontmatter";
 
 function firstHeading(text: string): string | undefined {
   const m = text.match(/^#{1,3}\s+(.+)$/m);
@@ -24,7 +14,7 @@ function tailSentence(text: string, max = 220): string {
 }
 
 export function inferSceneContract(draftText: string, existing?: SceneContract): SceneContract {
-  const fm = parseFrontmatter(draftText);
+  const { meta: fm } = parseFrontmatter(draftText);
   const beat = fm.beat || firstHeading(draftText) || "Advance the scene";
   const hook = tailSentence(draftText);
   const base = existing || {

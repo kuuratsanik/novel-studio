@@ -9,6 +9,7 @@ import { ContinuityDiagnostics } from "./services/diagnostics";
 import * as cmds from "./commands";
 import { StudioStatusBar } from "./services/statusBar";
 import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./services/automation";
+import { WikiLinkCompletionProvider, WikiLinkHoverProvider } from "./services/wikiProviders";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,6 +53,8 @@ export function activate(context: vscode.ExtensionContext) {
     status.disposable,
     vscode.window.registerWebviewViewProvider(NovelStudioProvider.viewType, provider),
     vscode.languages.registerCodeLensProvider({ language: "markdown" }, lenses),
+    vscode.languages.registerCompletionItemProvider({ language: "markdown" }, new WikiLinkCompletionProvider(), "[", "[["),
+    vscode.languages.registerHoverProvider({ language: "markdown" }, new WikiLinkHoverProvider()),
     vscode.commands.registerCommand("novelStudio.setKey", wrap(async () => {
       const service = await vscode.window.showQuickPick([...SECRET_SERVICES], { title: "Which service key?" });
       if (!service) return;
@@ -76,9 +79,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.audiobookBatch", wrap(() => cmds.batchAudiobook(audio))),
     vscode.commands.registerCommand("novelStudio.runPrompt", wrap(() => cmds.pickPromptAndRun(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.seedWorkspace", wrap(() => cmds.seedStudioFiles())),
-    vscode.commands.registerCommand("novelStudio.polishSelection", wrap(async () => {
-      await cmds.expandSelection(text, keyManager);
-    })),
+    vscode.commands.registerCommand("novelStudio.polishSelection", wrap(() => cmds.polishSelectionCmd(text, keyManager))),
+    vscode.commands.registerCommand("novelStudio.pickModel", wrap(() => cmds.pickModelCmd(keyManager))),
+    vscode.commands.registerCommand("novelStudio.brokenLinks", wrap(() => cmds.brokenLinksCmd())),
+    vscode.commands.registerCommand("novelStudio.wikiIndex", wrap(() => cmds.wikiIndexCmd())),
     vscode.commands.registerCommand("novelStudio.narrateChapter", wrap(async () => {
       const src = cmds.selection() || cmds.activeText();
       const rel = await audio.speak(src.slice(0, 4000), "openai");
