@@ -3,6 +3,8 @@ import { unknownNames } from "../services/bible";
 import { contractReady } from "../services/contracts";
 import { wordDiff } from "../services/diffUtil";
 import { DEFAULT_TEXT_MODELS, resolveTextModel } from "../services/modelDefaults";
+import { inferSceneContract } from "../services/autoContract";
+import { assembleToolPrompt, describeRoute } from "../services/studioHub";
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -34,6 +36,14 @@ export function runUnitTests(): string {
   assert(resolveTextModel("novelai", "auto") === DEFAULT_TEXT_MODELS.novelai, "novelai default");
   assert(resolveTextModel("openai", "gpt-custom") === "gpt-custom", "explicit model");
   assert(!resolveTextModel("anthropic", "auto").includes("claude-sonnet-4"), "no legacy sonnet-4 default");
+
+  const inferred = inferSceneContract("---\nbeat: Catalyst\n---\n\n# Chapter 2\n\nShe ran.");
+  assert(contractReady(inferred), "auto contract ready");
+  assert(inferred.goal.includes("Catalyst"), "auto contract goal");
+
+  const prompt = assembleToolPrompt("storyGen", { goal: "Escape", chars: "Mara", ending: "Door slams" });
+  assert(prompt.includes("Escape"), "tool prompt goal");
+  assert(describeRoute("charGen", {}) === "codex/characters.md", "char route");
 
   return "unit tests passed";
 }

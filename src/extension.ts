@@ -8,12 +8,25 @@ import { HeadingCodeLens } from "./services/headingCodeLens";
 import { ContinuityDiagnostics } from "./services/diagnostics";
 import * as cmds from "./commands";
 import { StudioStatusBar } from "./services/statusBar";
+import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./services/automation";
+
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return ((...args: unknown[]) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  }) as T;
+}
 
 export function activate(context: vscode.ExtensionContext) {
   const keyManager = new KeyManager(context.secrets);
   const diagnostics = new ContinuityDiagnostics();
-  const provider = new NovelStudioProvider(context.extensionUri, keyManager, diagnostics);
   const text = new TextRouter(keyManager, new NovelAiService(() => keyManager.getKey("novelai")));
+  const provider = new NovelStudioProvider(context.extensionUri, {
+    keys: keyManager,
+    diagnostics,
+    text,
+  });
   const audio = new AudioService(keyManager);
   const lenses = new HeadingCodeLens();
   const status = new StudioStatusBar(keyManager);
@@ -25,6 +38,14 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
     }
   };
+
+  const auditIfAutomatic = debounce(async () => {
+    const auto = automationSettings();
+    if (!auto.autoAuditOnSave) return;
+    const n = await diagnostics.runOnEditor();
+    status.setFlags(n);
+    await status.refresh();
+  }, 1200);
 
   context.subscriptions.push(
     diagnostics.disposable,
@@ -45,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
       const value = await vscode.window.showInputBox({ title: "OpenRouter key", password: true });
       if (value) await keyManager.setKey("openrouter", value);
     })),
-    vscode.commands.registerCommand("novelStudio.continueScene", wrap(() => cmds.continueScene(text, keyManager))),
+    vscode.commands.registerCommand("novelStudio.continueScene", wrap(() => cmds.continueScene(text, keyManager, diagnostics))),
     vscode.commands.registerCommand("novelStudio.expandSelection", wrap(() => cmds.expandSelection(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.diffRewrite", wrap(() => cmds.diffRewrite(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.multiAgent", wrap(() => cmds.multiAgent(text, keyManager))),
@@ -82,11 +103,24 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.applyStatePatch", wrap(() => cmds.applyStateFromSelection())),
     vscode.commands.registerCommand("novelStudio.runUnitTests", wrap(() => cmds.runTestsCmd())),
     vscode.window.onDidChangeActiveTextEditor(() => void status.refresh()),
-    vscode.workspace.onDidChangeTextDocument(() => void status.refresh()),
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      void status.refresh();
+      if (e.document.languageId === "markdown") auditIfAutomatic();
+    }),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (doc.languageId === "markdown") void auditIfAutomatic();
+    }),
   );
 
-  void cmds.seedStudioFiles().catch(() => undefined);
-  void status.refresh();
+  void (async () => {
+    const booted = await ensureWorkspaceReady().catch(() => false);
+    await cmds.seedStudioFiles().catch(() => undefined);
+    await warmWorkspaceState();
+    await status.refresh();
+    if (booted) {
+      vscode.window.showInformationMessage("Novel Studio bootstrapped your workspace automatically.");
+    }
+  })();
 }
 
 export function deactivate() {}

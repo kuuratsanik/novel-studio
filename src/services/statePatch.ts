@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CharacterState, loadState, saveState, SeriesState } from "./stateMachine";
+import { automationSettings } from "./automation";
 
 export interface StatePatch {
   name: string;
@@ -56,6 +57,13 @@ export async function reviewAndApply(prose: string): Promise<string> {
   const state = await loadState();
   const patches = proposeStatePatches(prose, state);
   if (!patches.length) return "No state patches proposed.";
+
+  const auto = automationSettings();
+  if (auto.autoApplyStatePatches) {
+    const n = await applyPatches(patches);
+    return `Auto-applied ${n} state patch(es) to codex/state.json`;
+  }
+
   const items = patches.map((p) => `${p.name}: ${String(p.field)} ${p.from} → ${p.to}`);
   const pick = await vscode.window.showQuickPick(
     [{ label: "Apply all", description: items.join("; ") }, { label: "Skip" }],

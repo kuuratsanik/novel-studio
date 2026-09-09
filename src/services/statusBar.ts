@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { KeyManager } from "./keyManager";
 import { loadContract, contractReady, currentDraftRel } from "./contracts";
+import { automationSettings } from "./automation";
 
 export class StudioStatusBar {
   private readonly item: vscode.StatusBarItem;
@@ -32,7 +33,8 @@ export class StudioStatusBar {
     }
     const cfg = vscode.workspace.getConfiguration("novelStudio");
     const provider = cfg.get<string>("defaultProvider") || "auto";
-    this.item.text = `$(book) ${words}w · ${contract} · ${this.flags} flags · ${provider}`;
-    this.item.tooltip = "Novel Studio status — click to audit continuity";
+    const auto = automationSettings().fullyAutomatic ? "auto" : "manual";
+    this.item.text = `$(book) ${words}w · ${contract} · ${this.flags} flags · ${auto} · ${provider}`;
+    this.item.tooltip = "Novel Studio — click to audit continuity";
   }
 }

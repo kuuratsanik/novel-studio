@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -46,10 +46,40 @@
     "configuration": {
       "title": "Novel Studio",
       "properties": {
+        "novelStudio.fullyAutomatic": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Novel Studio end-to-end without copy/paste or confirmation prompts."
+        },
         "novelStudio.offlineFirst": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Prefer Ollama or other local engines."
+        },
+        "novelStudio.autoBootstrap": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create novel workspace files automatically when studio.json is missing."
+        },
+        "novelStudio.autoAuditOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run continuity audit automatically while editing markdown."
+        },
+        "novelStudio.autoApplyStatePatches": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply series state patches without prompting."
+        },
+        "novelStudio.autoApplyRewrites": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply diff rewrites without confirmation."
+        },
+        "novelStudio.autoRouteSidebarOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert or save Studio Hub output to the correct file automatically."
         },
         "novelStudio.defaultProvider": {
           "type": "string",

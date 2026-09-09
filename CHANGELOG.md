@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- Fully automatic mode (default): Studio Hub generates and routes output without copy/paste.
+- Auto-bootstrap workspace, infer scene contracts, apply state patches, and audit on save.
+- Local-first routing probes Ollama automatically; RAG retrieval wired into context packing.
+- Continuity diagnostics jump to the matching prose range.
+
 ## 1.0.1
 
 - Centralize fiction-oriented default models (Claude Sonnet 5, GPT-4.1, Qwen 2.5 32B, NovelAI Erato).

@@ -9,6 +9,8 @@ import { logUsage } from "./services/usage";
 import { REVISION_MODES, RevisionMode } from "./services/revisionModes";
 import { formatDiff, wordDiff } from "./services/diffUtil";
 import { LOCAL_TEXT_PROVIDERS, resolveTextModel } from "./services/modelDefaults";
+import { automationSettings, probeLocalEngine } from "./services/automation";
+import { ensureSceneContract } from "./services/autoContract";
 
 export function selection(): string {
   const ed = vscode.window.activeTextEditor;
@@ -38,8 +40,12 @@ export async function pickRoute(keys: KeyManager): Promise<{ provider: string; m
   const forced = cfg.get<string>("defaultProvider") || "";
   const defaultModel = cfg.get<string>("defaultModel") || "";
   const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
+  const auto = automationSettings();
   if (forced && forced !== "auto") {
     return { provider: forced, model: resolveTextModel(forced, defaultModel || "auto"), localUrl };
+  }
+  if ((auto.offlineFirst || auto.fullyAutomatic) && (await probeLocalEngine(localUrl))) {
+    return { provider: "ollama", model: resolveTextModel("ollama", defaultModel || "auto"), localUrl };
   }
   const hasCloud =
     (await keys.hasKey("openrouter")) ||
@@ -92,26 +98,21 @@ export async function generatePacked(text: TextRouter, keys: KeyManager, prompt:
   return out;
 }
 
-export async function continueScene(text: TextRouter, keys: KeyManager) {
-  const { loadContract, contractReady, seedContract, currentDraftRel } = await import("./services/contracts");
+export async function continueScene(text: TextRouter, keys: KeyManager, diagnostics?: import("./services/diagnostics").ContinuityDiagnostics) {
+  const { currentDraftRel } = await import("./services/contracts");
   const rel = currentDraftRel();
-  if (rel) {
-    let loaded = await loadContract(rel);
-    if (!loaded) {
-      await seedContract(rel);
-      throw new Error(`Fill drafts/contracts/${rel.replace(/^drafts\/|\.md$/g, "")}.json before Continue.`);
-    }
-    if (!contractReady(loaded.contract)) {
-      throw new Error("Scene contract is incomplete. Fill goal, conflict, turn, and exit.");
-    }
-  }
+  if (rel) await ensureSceneContract(rel);
   const sys = await loadPrompt("continue");
   const prompt = selection() || activeText().slice(-1800) || "Open the next beat.";
   const out = await generatePacked(text, keys, prompt, sys);
   insert(out);
   const { reviewAndApply } = await import("./services/statePatch");
   const msg = await reviewAndApply(out);
-  if (msg && !msg.startsWith("No state")) vscode.window.showInformationMessage(msg);
+  const auto = automationSettings();
+  if (auto.autoAuditOnSave && diagnostics) await diagnostics.runOnEditor();
+  if (msg && !msg.startsWith("No state") && !auto.autoApplyStatePatches) {
+    vscode.window.showInformationMessage(msg);
+  }
 }
 
 export async function expandSelection(text: TextRouter, keys: KeyManager) {
@@ -125,6 +126,11 @@ export async function diffRewrite(text: TextRouter, keys: KeyManager) {
   const src = selection();
   if (!src) throw new Error("Select text to rewrite.");
   const out = await generatePacked(text, keys, src, await loadPrompt("rewrite"));
+  const auto = automationSettings();
+  if (auto.autoApplyRewrites) {
+    replaceSel(out);
+    return;
+  }
   const shown = formatDiff(wordDiff(src, out));
   const pick = await vscode.window.showQuickPick(["Apply rewrite", "Keep original"], { title: shown.slice(0, 80) });
   if (pick === "Apply rewrite") replaceSel(out);
