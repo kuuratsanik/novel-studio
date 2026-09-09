@@ -24,14 +24,28 @@ export async function loadBible(): Promise<Bible> {
   return { names: clean.sort(), headings, text: parts.join("\n\n").slice(0, 24_000) };
 }
 
-export function unknownNames(prose: string, bible: Bible): string[] {
-  const found = new Set<string>();
-  for (const m of prose.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g)) {
-    found.add(m[1]);
-  }
+export interface NameHit {
+  name: string;
+  index: number;
+}
+
+export function unknownNameHits(prose: string, bible: Bible): NameHit[] {
   const known = new Set(bible.names.map((n) => n.toLowerCase()));
   const skip = new Set(["I", "The", "A", "An", "He", "She", "They", "It", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
-  return [...found].filter((n) => !skip.has(n) && !known.has(n.toLowerCase()));
+  const hits: NameHit[] = [];
+  const seen = new Set<string>();
+  for (const m of prose.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g)) {
+    const name = m[1];
+    const key = name.toLowerCase();
+    if (seen.has(key) || skip.has(name) || known.has(key) || m.index === undefined) continue;
+    seen.add(key);
+    hits.push({ name, index: m.index });
+  }
+  return hits;
+}
+
+export function unknownNames(prose: string, bible: Bible): string[] {
+  return unknownNameHits(prose, bible).map((h) => h.name);
 }
 
 export function bibleLockPrompt(bible: Bible, allowException: boolean): string {

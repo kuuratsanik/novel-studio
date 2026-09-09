@@ -3,7 +3,10 @@
 src/**
 tsconfig.json
 **/*.map
+out/test/**
 .gitignore
 PUBLISH.md
 node_modules/**
 *.vsix
+package-lock.json
+**/*.b64

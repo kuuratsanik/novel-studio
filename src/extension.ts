@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.narrateChapter", wrap(async () => {
       const src = cmds.selection() || cmds.activeText();
       const rel = await audio.speak(src.slice(0, 4000), "openai");
-      cmds.insert(`[narration](${rel})`);
+      await cmds.insert(`[narration](${rel})`);
     })),
     vscode.commands.registerCommand("novelStudio.revisionMode", wrap(() => cmds.revisionPass(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.seedState", wrap(() => cmds.seedState())),

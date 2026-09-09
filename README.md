@@ -10,7 +10,7 @@ Repo: https://github.com/kuuratsanik/novel-studio
 
 **Fastest — no compile.** Use the packaged VSIX:
 
-1. Download `novel-studio-1.0.0.vsix` from the Novel Studio web desk **Export** tab (or from GitHub Actions **Package** artifacts after a main-branch run).
+1. Download `novel-studio-1.1.0.vsix` from the Novel Studio web desk **Export** tab (or from GitHub Actions **Package** artifacts after a main-branch run).
 2. In VS Code press `Ctrl+Shift+P` → **Extensions: Install from VSIX…** → pick that file.
 3. Reload the window when asked.
 4. Click the Novel Studio book icon in the Activity Bar.
@@ -36,10 +36,12 @@ Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity au
 git clone https://github.com/kuuratsanik/novel-studio.git
 cd novel-studio
 npm install
-npm run compile
-npx @vscode/vsce package --allow-missing-repository
-code --install-extension novel-studio-1.0.0.vsix
+npm test
+npx @vscode/vsce package
+code --install-extension novel-studio-1.1.0.vsix
 ```
+
+Press F5 in this folder to launch an Extension Development Host.
 
 ## Marketplace
 

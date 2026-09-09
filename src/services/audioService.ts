@@ -1,5 +1,6 @@
 import { KeyManager } from "./keyManager";
 import { writeWorkspaceFile } from "./workspaceIo";
+import { timedFetch } from "./http";
 
 export class AudioService {
   constructor(private readonly keys: KeyManager) {}
@@ -18,7 +19,7 @@ export class AudioService {
 
   private async elevenLabs(text: string, voiceId: string): Promise<Buffer> {
     const key = await this.keys.requireKey("elevenlabs", "ElevenLabs key missing.");
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const response = await timedFetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "xi-api-key": key, Accept: "audio/mpeg" },
       body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }),
@@ -29,7 +30,7 @@ export class AudioService {
 
   private async openaiTts(text: string, voice: string): Promise<Buffer> {
     const key = await this.keys.requireKey("openai", "OpenAI key missing.");
-    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+    const response = await timedFetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model: "gpt-4o-mini-tts", voice, input: text }),

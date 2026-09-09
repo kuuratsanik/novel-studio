@@ -15,7 +15,9 @@ export class ContinuityDiagnostics {
     }
     const flags = await auditProse(ed.document.getText());
     const diags = flags.map((f) => {
-      const d = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 1), f.message, vscode.DiagnosticSeverity.Warning);
+      const start = ed.document.positionAt(Math.max(0, f.start));
+      const end = ed.document.positionAt(Math.max(f.start, f.end));
+      const d = new vscode.Diagnostic(new vscode.Range(start, end), f.message, vscode.DiagnosticSeverity.Warning);
       d.source = "Novel Studio";
       return d;
     });

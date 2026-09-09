@@ -2,9 +2,10 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#1c1612",
     "theme": "dark"
@@ -24,6 +25,16 @@
   "categories": ["Other", "Education"],
   "activationEvents": ["onView:novelStudio.sidebar", "onLanguage:markdown"],
   "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Novel Studio stores API keys in SecretStorage and writes manuscript files in the workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "files": ["out", "media", "resources", "LICENSE", "README.md", "CHANGELOG.md"],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -54,6 +65,21 @@
         "novelStudio.defaultProvider": {
           "type": "string",
           "default": "auto",
+          "enum": [
+            "auto",
+            "ollama",
+            "openrouter",
+            "openai",
+            "anthropic",
+            "novelai",
+            "gemini",
+            "deepinfra",
+            "together",
+            "fireworks",
+            "kobold",
+            "oobabooga",
+            "tabby"
+          ],
           "description": "Force a text provider or leave auto."
         },
         "novelStudio.defaultModel": {
@@ -70,6 +96,13 @@
           "type": "boolean",
           "default": false,
           "description": "Do not send series bible or RAG context to cloud providers."
+        },
+        "novelStudio.requestTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 5000,
+          "maximum": 600000,
+          "description": "HTTP timeout in milliseconds for text, image, and audio provider calls."
         }
       }
     },
@@ -156,11 +189,12 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "npx @vscode/vsce package --allow-missing-repository"
+    "test": "npm run compile && node ./out/test/run.js",
+    "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.13.0",
+    "@types/vscode": "1.85.0",
     "typescript": "^5.5.0"
   }
 }

@@ -2,6 +2,14 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { KeyManager } from "./services/keyManager";
 import { ContinuityDiagnostics } from "./services/diagnostics";
+import { isAllowedToolUrl } from "./services/toolUrls";
+
+function nonce(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  for (let i = 0; i < 32; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+  return out;
+}
 
 export class NovelStudioProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "novelStudio.sidebar";
@@ -25,7 +33,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri],
     };
 
-    webviewView.webview.html = this._getHtmlForWebview();
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.type) {
@@ -37,6 +45,10 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
           break;
         }
         case "openToolUrl": {
+          if (!isAllowedToolUrl(data.url)) {
+            vscode.window.showErrorMessage("Blocked unexpected tool URL.");
+            break;
+          }
           vscode.env.openExternal(vscode.Uri.parse(data.url));
           break;
         }
@@ -125,11 +137,13 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _getHtmlForWebview(): string {
+  private _getHtmlForWebview(webview: vscode.Webview): string {
+    const cspNonce = nonce();
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${cspNonce}';">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
         body { font-family: var(--vscode-font-family); padding: 10px; color: var(--vscode-foreground); }
@@ -236,7 +250,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
 
       <button id="btnRouteAction">Insert into Scene</button>
 
-      <script>
+      <script nonce="${cspNonce}">
         const vscode = acquireVsCodeApi();
 
         const toolUrls = {

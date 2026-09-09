@@ -39,7 +39,7 @@ npx @vscode/vsce login kuuratsanik
 
 # Local .vsix smoke test
 npx @vscode/vsce package
-code --install-extension kuuratsanik-novel-studio-1.0.0.vsix
+code --install-extension kuuratsanik-novel-studio-1.1.0.vsix
 
 # Live Marketplace
 npx @vscode/vsce publish
