@@ -1,20 +1,10 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
+import { BLANK_CONTRACT, SceneContract, contractPath } from "../core/contract";
 
-export interface SceneContract {
-  goal: string;
-  conflict: string;
-  turn: string;
-  exit: string;
-  mustInclude: string[];
-  mustNot: string[];
-  complete?: boolean;
-}
-
-export function contractReady(c: SceneContract): boolean {
-  return !!(c.goal && c.conflict && c.turn && c.exit);
-}
+export { contractReady, contractPath, contractPrompt } from "../core/contract";
+export type { SceneContract } from "../core/contract";
 
 export function currentDraftRel(): string | undefined {
   const ed = vscode.window.activeTextEditor;
@@ -25,12 +15,9 @@ export function currentDraftRel(): string | undefined {
   return rel.startsWith("drafts/") && rel.endsWith(".md") ? rel : undefined;
 }
 
-export function contractPath(draftRel: string): string {
-  const stem = draftRel.replace(/^drafts\//, "").replace(/\.md$/, "");
-  return `drafts/contracts/${stem}.json`;
-}
-
-export async function loadContract(draftRel: string): Promise<{ rel: string; contract: SceneContract } | undefined> {
+export async function loadContract(
+  draftRel: string,
+): Promise<{ rel: string; contract: SceneContract } | undefined> {
   try {
     const rel = contractPath(draftRel);
     const contract = JSON.parse(await readWorkspaceFile(rel)) as SceneContract;
@@ -43,29 +30,6 @@ export async function loadContract(draftRel: string): Promise<{ rel: string; con
 export async function seedContract(draftRel?: string): Promise<string> {
   const rel = draftRel || currentDraftRel() || "drafts/ch01.md";
   const dest = contractPath(rel);
-  const blank: SceneContract = {
-    goal: "",
-    conflict: "",
-    turn: "",
-    exit: "",
-    mustInclude: [],
-    mustNot: [],
-    complete: false,
-  };
-  await writeWorkspaceFile(dest, JSON.stringify(blank, null, 2) + "\n");
+  await writeWorkspaceFile(dest, JSON.stringify(BLANK_CONTRACT, null, 2) + "\n");
   return dest;
-}
-
-export function contractPrompt(c: SceneContract): string {
-  return [
-    `Scene contract:`,
-    `Goal: ${c.goal}`,
-    `Conflict: ${c.conflict}`,
-    `Turn: ${c.turn}`,
-    `Exit: ${c.exit}`,
-    c.mustInclude.length ? `Must include: ${c.mustInclude.join("; ")}` : "",
-    c.mustNot.length ? `Must not: ${c.mustNot.join("; ")}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
 }

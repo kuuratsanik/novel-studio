@@ -1,18 +1,8 @@
 import { listMarkdown, readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
+import { SeriesState } from "../core/state";
 
-export interface CharacterState {
-  name: string;
-  location?: string;
-  status?: string;
-  inventory: string[];
-  relationships: Record<string, string>;
-  facts: string[];
-}
-
-export interface SeriesState {
-  updated: string;
-  characters: CharacterState[];
-}
+export { statePrompt, applyPatchesTo } from "../core/state";
+export type { CharacterState, SeriesState, StatePatch } from "../core/state";
 
 const PATH = "codex/state.json";
 
@@ -51,15 +41,4 @@ export async function seedStateFromCodex(): Promise<SeriesState> {
   }
   await saveState(existing);
   return existing;
-}
-
-export function statePrompt(state: SeriesState): string {
-  if (!state.characters.length) {
-    return "Series state is empty. Do not invent locations or injuries.";
-  }
-  const lines = state.characters.map((c) => {
-    const rel = Object.entries(c.relationships).map(([k, v]) => `${k}:${v}`).join(", ") || "n/a";
-    return `- ${c.name} @ ${c.location ?? "?"} [${c.status ?? "?"}] inv:${c.inventory.join("|") || "—"} rel:${rel}`;
-  });
-  return `Live series state (do not contradict):\n${lines.join("\n")}`;
 }
