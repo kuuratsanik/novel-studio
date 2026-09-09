@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#1c1612",
     "theme": "dark"
@@ -70,6 +71,17 @@
           "type": "boolean",
           "default": false,
           "description": "Do not send series bible or RAG context to cloud providers."
+        },
+        "novelStudio.requestTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 1000,
+          "description": "Abort a generation request after this many milliseconds."
+        },
+        "novelStudio.auditOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-run the continuity audit when a Markdown file is saved."
         }
       }
     },
@@ -156,11 +168,18 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "typecheck": "tsc -p ./ --noEmit",
+    "lint": "eslint src",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "verify": "npm run lint && npm run test",
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "devDependencies": {
+    "@eslint/js": "^9.13.0",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.85.0",
-    "typescript": "^5.5.0"
+    "eslint": "^9.13.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.11.0"
   }
 }

@@ -1,9 +1,14 @@
 .vscode/**
 .github/**
 src/**
+out/test/**
+out/**/*.map
 tsconfig.json
+eslint.config.mjs
 **/*.map
 .gitignore
 PUBLISH.md
+UPGRADES.md
 node_modules/**
 *.vsix
+resources/*.b64

@@ -1,14 +1,19 @@
-name: Package
+name: CI
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  vsix:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,10 +23,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
-      - run: npx @vscode/vsce package --allow-missing-repository
-      - uses: actions/upload-artifact@v4
-        with:
-          name: novel-studio-vsix
-          path: "*.vsix"
-          if-no-files-found: error
