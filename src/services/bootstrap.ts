@@ -26,6 +26,6 @@ export async function bootstrapWorkspace(title = "Untitled Novel"): Promise<stri
   for (const [rel, body] of Object.entries(files)) {
     await writeWorkspaceFile(rel, body);
   }
-  await ensurePromptLibrary();
+  await ensurePromptLibrary(true);
   return `Bootstrapped ${title}: drafts/, codex/, contracts, prompts, research, gold.`;
 }

@@ -1,6 +1,13 @@
 import * as path from "path";
 import * as vscode from "vscode";
 
+/** Markers that identify a folder as an actual Novel Studio project. */
+const PROJECT_MARKERS = ["studio.json", "drafts", "codex"];
+
+export function hasWorkspaceFolder(): boolean {
+  return !!vscode.workspace.workspaceFolders?.length;
+}
+
 export function workspaceRoot(): string {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
@@ -10,7 +17,32 @@ export function workspaceRoot(): string {
 }
 
 export function uriFor(rel: string): vscode.Uri {
-  return vscode.Uri.file(path.join(workspaceRoot(), rel));
+  const root = workspaceRoot();
+  const target = path.resolve(root, rel);
+  const contained = target === root || target.startsWith(root + path.sep);
+  if (!contained) {
+    throw new Error(`Refusing to touch a path outside the workspace: ${rel}`);
+  }
+  return vscode.Uri.file(target);
+}
+
+/**
+ * True when the open folder already looks like a novel project. Used to keep
+ * the extension from scaffolding files into unrelated repositories that merely
+ * happen to contain Markdown.
+ */
+export async function isNovelWorkspace(): Promise<boolean> {
+  if (!hasWorkspaceFolder()) return false;
+  const root = workspaceRoot();
+  for (const marker of PROJECT_MARKERS) {
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.file(path.join(root, marker)));
+      return true;
+    } catch {
+      // Marker absent; try the next one.
+    }
+  }
+  return false;
 }
 
 export async function writeWorkspaceFile(rel: string, content: string | Buffer): Promise<string> {

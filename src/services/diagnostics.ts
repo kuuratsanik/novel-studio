@@ -13,13 +13,25 @@ export class ContinuityDiagnostics {
     if (!ed || ed.document.languageId !== "markdown") {
       return 0;
     }
-    const flags = await auditProse(ed.document.getText());
+    const doc = ed.document;
+    const flags = await auditProse(doc.getText());
     const diags = flags.map((f) => {
-      const d = new vscode.Diagnostic(new vscode.Range(0, 0, 0, 1), f.message, vscode.DiagnosticSeverity.Warning);
+      const range =
+        f.index === undefined
+          ? new vscode.Range(0, 0, 0, 1)
+          : new vscode.Range(
+              doc.positionAt(f.index),
+              doc.positionAt(f.index + (f.length ?? 1)),
+            );
+      const severity =
+        f.severity === "information"
+          ? vscode.DiagnosticSeverity.Information
+          : vscode.DiagnosticSeverity.Warning;
+      const d = new vscode.Diagnostic(range, f.message, severity);
       d.source = "Novel Studio";
       return d;
     });
-    this.collection.set(ed.document.uri, diags);
+    this.collection.set(doc.uri, diags);
     return diags.length;
   }
 }

@@ -10,82 +10,111 @@ import * as cmds from "./commands";
 import { StudioStatusBar } from "./services/statusBar";
 
 export function activate(context: vscode.ExtensionContext) {
+  const log = vscode.window.createOutputChannel("Novel Studio", { log: true });
   const keyManager = new KeyManager(context.secrets);
   const diagnostics = new ContinuityDiagnostics();
-  const provider = new NovelStudioProvider(context.extensionUri, keyManager, diagnostics);
+  const provider = new NovelStudioProvider(context.extensionUri);
   const text = new TextRouter(keyManager, new NovelAiService(() => keyManager.getKey("novelai")));
   const audio = new AudioService(keyManager);
   const lenses = new HeadingCodeLens();
-  const status = new StudioStatusBar(keyManager);
+  const status = new StudioStatusBar();
 
   const wrap = (fn: () => Promise<void>) => async () => {
     try {
       await fn();
     } catch (err) {
-      vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      log.error(err instanceof Error ? err : new Error(message));
+      vscode.window.showErrorMessage(message);
     }
   };
 
+  const register = (id: string, fn: () => Promise<void>) =>
+    vscode.commands.registerCommand(id, wrap(fn));
+
+  let auditTimer: NodeJS.Timeout | undefined;
+  const scheduleAudit = (doc: vscode.TextDocument) => {
+    const enabled = vscode.workspace
+      .getConfiguration("novelStudio")
+      .get<boolean>("auditOnSave", true);
+    if (!enabled || doc.languageId !== "markdown") return;
+    if (auditTimer) clearTimeout(auditTimer);
+    auditTimer = setTimeout(() => {
+      void diagnostics
+        .runOnEditor()
+        .then((n) => status.setFlags(n))
+        .catch((err) => log.error(err instanceof Error ? err : new Error(String(err))));
+    }, 750);
+  };
+
   context.subscriptions.push(
+    log,
     diagnostics.disposable,
     status.disposable,
+    new vscode.Disposable(() => auditTimer && clearTimeout(auditTimer)),
     vscode.window.registerWebviewViewProvider(NovelStudioProvider.viewType, provider),
     vscode.languages.registerCodeLensProvider({ language: "markdown" }, lenses),
-    vscode.commands.registerCommand("novelStudio.setKey", wrap(async () => {
-      const service = await vscode.window.showQuickPick([...SECRET_SERVICES], { title: "Which service key?" });
+
+    register("novelStudio.setKey", async () => {
+      const service = await vscode.window.showQuickPick([...SECRET_SERVICES], {
+        title: "Which service key?",
+      });
       if (!service) return;
-      const value = await vscode.window.showInputBox({ title: `Store ${service} key`, password: true });
-      if (value) await keyManager.setKey(service, value);
-    })),
-    vscode.commands.registerCommand("novelStudio.setNovelAiKey", wrap(async () => {
+      const value = await vscode.window.showInputBox({
+        title: `Store ${service} key`,
+        password: true,
+      });
+      if (value) {
+        await keyManager.setKey(service, value);
+        vscode.window.showInformationMessage(`Stored ${service} key.`);
+      }
+    }),
+    register("novelStudio.setNovelAiKey", async () => {
       const value = await vscode.window.showInputBox({ title: "NovelAI token", password: true });
       if (value) await keyManager.setKey("novelai", value);
-    })),
-    vscode.commands.registerCommand("novelStudio.setOpenRouterKey", wrap(async () => {
+    }),
+    register("novelStudio.setOpenRouterKey", async () => {
       const value = await vscode.window.showInputBox({ title: "OpenRouter key", password: true });
       if (value) await keyManager.setKey("openrouter", value);
-    })),
-    vscode.commands.registerCommand("novelStudio.continueScene", wrap(() => cmds.continueScene(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.expandSelection", wrap(() => cmds.expandSelection(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.diffRewrite", wrap(() => cmds.diffRewrite(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.multiAgent", wrap(() => cmds.multiAgent(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.auditContinuity", wrap(() => cmds.runAudit(diagnostics))),
-    vscode.commands.registerCommand("novelStudio.compileManuscript", wrap(() => cmds.compileAll())),
-    vscode.commands.registerCommand("novelStudio.exportLora", wrap(() => cmds.exportLora())),
-    vscode.commands.registerCommand("novelStudio.audiobookBatch", wrap(() => cmds.batchAudiobook(audio))),
-    vscode.commands.registerCommand("novelStudio.runPrompt", wrap(() => cmds.pickPromptAndRun(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.seedWorkspace", wrap(() => cmds.seedStudioFiles())),
-    vscode.commands.registerCommand("novelStudio.polishSelection", wrap(async () => {
-      await cmds.expandSelection(text, keyManager);
-    })),
-    vscode.commands.registerCommand("novelStudio.narrateChapter", wrap(async () => {
-      const src = cmds.selection() || cmds.activeText();
-      const rel = await audio.speak(src.slice(0, 4000), "openai");
-      cmds.insert(`[narration](${rel})`);
-    })),
-    vscode.commands.registerCommand("novelStudio.revisionMode", wrap(() => cmds.revisionPass(text, keyManager))),
-    vscode.commands.registerCommand("novelStudio.seedState", wrap(() => cmds.seedState())),
-    vscode.commands.registerCommand("novelStudio.seedContract", wrap(() => cmds.seedContractCmd())),
-    vscode.commands.registerCommand("novelStudio.buildVoices", wrap(() => cmds.buildVoices())),
-    vscode.commands.registerCommand("novelStudio.outlineSync", wrap(() => cmds.outlineSyncCmd())),
-    vscode.commands.registerCommand("novelStudio.analytics", wrap(() => cmds.analyticsCmd())),
-    vscode.commands.registerCommand("novelStudio.snapshot", wrap(() => cmds.snapshotCmd())),
-    vscode.commands.registerCommand("novelStudio.mergeBranch", wrap(() => cmds.mergeCmd())),
-    vscode.commands.registerCommand("novelStudio.clipResearch", wrap(() => cmds.researchCmd())),
-    vscode.commands.registerCommand("novelStudio.publishPackage", wrap(() => cmds.publishCmd())),
-    vscode.commands.registerCommand("novelStudio.addComment", wrap(() => cmds.commentCmd())),
-    vscode.commands.registerCommand("novelStudio.evalHarness", wrap(() => cmds.evalCmd())),
-    vscode.commands.registerCommand("novelStudio.readAloudQa", wrap(() => cmds.readAloudCmd())),
-    vscode.commands.registerCommand("novelStudio.bootstrap", wrap(() => cmds.bootstrapCmd())),
-    vscode.commands.registerCommand("novelStudio.importDocx", wrap(() => cmds.importDocxCmd())),
-    vscode.commands.registerCommand("novelStudio.archiveProject", wrap(() => cmds.archiveCmd())),
-    vscode.commands.registerCommand("novelStudio.applyStatePatch", wrap(() => cmds.applyStateFromSelection())),
-    vscode.commands.registerCommand("novelStudio.runUnitTests", wrap(() => cmds.runTestsCmd())),
+    }),
+
+    register("novelStudio.continueScene", () => cmds.continueScene(text, keyManager)),
+    register("novelStudio.expandSelection", () => cmds.expandSelection(text, keyManager)),
+    register("novelStudio.diffRewrite", () => cmds.diffRewrite(text, keyManager)),
+    register("novelStudio.multiAgent", () => cmds.multiAgent(text, keyManager)),
+    register("novelStudio.auditContinuity", () => cmds.runAudit(diagnostics, status)),
+    register("novelStudio.compileManuscript", () => cmds.compileAll()),
+    register("novelStudio.exportLora", () => cmds.exportLora()),
+    register("novelStudio.audiobookBatch", () => cmds.batchAudiobook(audio)),
+    register("novelStudio.runPrompt", () => cmds.pickPromptAndRun(text, keyManager)),
+    register("novelStudio.seedWorkspace", () => cmds.seedStudioFiles()),
+    register("novelStudio.polishSelection", () => cmds.expandSelection(text, keyManager)),
+    register("novelStudio.narrateChapter", () => cmds.narrateChapter(audio)),
+    register("novelStudio.revisionMode", () => cmds.revisionPass(text, keyManager)),
+    register("novelStudio.seedState", () => cmds.seedState()),
+    register("novelStudio.seedContract", () => cmds.seedContractCmd()),
+    register("novelStudio.buildVoices", () => cmds.buildVoices()),
+    register("novelStudio.outlineSync", () => cmds.outlineSyncCmd()),
+    register("novelStudio.analytics", () => cmds.analyticsCmd()),
+    register("novelStudio.snapshot", () => cmds.snapshotCmd()),
+    register("novelStudio.mergeBranch", () => cmds.mergeCmd()),
+    register("novelStudio.clipResearch", () => cmds.researchCmd()),
+    register("novelStudio.publishPackage", () => cmds.publishCmd()),
+    register("novelStudio.addComment", () => cmds.commentCmd()),
+    register("novelStudio.evalHarness", () => cmds.evalCmd()),
+    register("novelStudio.readAloudQa", () => cmds.readAloudCmd()),
+    register("novelStudio.bootstrap", () => cmds.bootstrapCmd()),
+    register("novelStudio.importDocx", () => cmds.importDocxCmd()),
+    register("novelStudio.archiveProject", () => cmds.archiveCmd()),
+    register("novelStudio.applyStatePatch", () => cmds.applyStateFromSelection()),
+    register("novelStudio.runUnitTests", () => cmds.runTestsCmd()),
+
     vscode.window.onDidChangeActiveTextEditor(() => void status.refresh()),
     vscode.workspace.onDidChangeTextDocument(() => void status.refresh()),
+    vscode.workspace.onDidSaveTextDocument(scheduleAudit),
+    context.secrets.onDidChange(() => void status.refresh()),
   );
 
-  void cmds.seedStudioFiles().catch(() => undefined);
   void status.refresh();
 }
 

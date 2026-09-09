@@ -1,12 +1,31 @@
-import { writeWorkspaceFile, readWorkspaceFile } from "./workspaceIo";
+import { isNovelWorkspace, readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
 
-export async function ensureBeats(): Promise<void> {
+const BEAT_SHEET = [
+  "# Beat sheet",
+  "",
+  "- Opening image",
+  "- Theme stated",
+  "- Setup",
+  "- Catalyst",
+  "- Debate",
+  "- Break into two",
+  "- B story",
+  "- Fun and games",
+  "- Midpoint",
+  "- Bad guys close in",
+  "- All is lost",
+  "- Dark night",
+  "- Break into three",
+  "- Finale",
+  "- Final image",
+  "",
+].join("\n");
+
+export async function ensureBeats(force = false): Promise<void> {
+  if (!force && !(await isNovelWorkspace())) return;
   try {
     await readWorkspaceFile("codex/beats.md");
   } catch {
-    await writeWorkspaceFile(
-      "codex/beats.md",
-      "# Beat sheet\n\n- Opening image\n- Theme stated\n- Setup\n- Catalyst\n- Debate\n- Break into two\n- B story\n- Fun and games\n- Midpoint\n- Bad guys close in\n- All is lost\n- Dark night\n- Break into three\n- Finale\n- Final image\n",
-    );
+    await writeWorkspaceFile("codex/beats.md", BEAT_SHEET);
   }
 }

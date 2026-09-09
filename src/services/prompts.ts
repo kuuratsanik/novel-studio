@@ -1,4 +1,4 @@
-import { readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
+import { isNovelWorkspace, readWorkspaceFile, writeWorkspaceFile } from "./workspaceIo";
 
 const DEFAULTS: Record<string, string> = {
   continue: "Continue the scene in the established voice. Do not recap. Advance the beat.",
@@ -7,7 +7,13 @@ const DEFAULTS: Record<string, string> = {
   multi: "You are one pass in a writer/editor/auditor pipeline. Follow the role given.",
 };
 
-export async function ensurePromptLibrary(): Promise<void> {
+/**
+ * Writes the editable prompt files, but only into a folder that is already a
+ * novel project. `force` is used by the explicit seed and bootstrap commands,
+ * where the user has asked for scaffolding.
+ */
+export async function ensurePromptLibrary(force = false): Promise<void> {
+  if (!force && !(await isNovelWorkspace())) return;
   for (const [name, body] of Object.entries(DEFAULTS)) {
     const rel = `prompts/${name}.md`;
     try {
@@ -19,15 +25,15 @@ export async function ensurePromptLibrary(): Promise<void> {
 }
 
 export async function loadPrompt(name: string): Promise<string> {
-  await ensurePromptLibrary();
   try {
-    return (await readWorkspaceFile(`prompts/${name}.md`)).trim();
+    const body = (await readWorkspaceFile(`prompts/${name}.md`)).trim();
+    if (body) return body;
   } catch {
-    return DEFAULTS[name] || "Write the next beat.";
+    // No override on disk; fall through to the built-in default.
   }
+  return DEFAULTS[name] || "Write the next beat.";
 }
 
-export async function listPrompts(): Promise<string[]> {
-  await ensurePromptLibrary();
+export function listPrompts(): string[] {
   return Object.keys(DEFAULTS);
 }

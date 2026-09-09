@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
-import { KeyManager } from "./keyManager";
 import { loadContract, contractReady, currentDraftRel } from "./contracts";
 
 export class StudioStatusBar {
   private readonly item: vscode.StatusBarItem;
   private flags = 0;
 
-  constructor(private readonly keys: KeyManager) {
+  constructor() {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 80);
     this.item.command = "novelStudio.auditContinuity";
     this.item.show();
