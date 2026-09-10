@@ -12,7 +12,7 @@ jobs:
         with:
           node-version: "20"
       - run: npm install
-      - run: npm test
+      - run: npm run orchestrate:ci
       - run: xvfb-run -a npm run test:integration
       - run: npx @vscode/vsce package --allow-missing-repository
       - uses: actions/upload-artifact@v4

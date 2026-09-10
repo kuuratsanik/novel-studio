@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -151,6 +151,16 @@
           "type": "string",
           "default": "qwen2.5:32b-instruct",
           "description": "Writer local model for scene generation and continuation."
+        },
+        "novelStudio.autoOrchestrateOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run startup orchestrator when a novel workspace opens."
+        },
+        "novelStudio.orchestrateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run save orchestrator (graph, links, analytics) after markdown saves."
         }
       }
     },
@@ -212,6 +222,7 @@
       { "command": "novelStudio.cancelGeneration", "title": "Novel Studio: Cancel Generation" },
       { "command": "novelStudio.writeScene", "title": "Novel Studio: Write Scene Pipeline" },
       { "command": "novelStudio.fixContinuity", "title": "Novel Studio: Fix Continuity Issue" },
+      { "command": "novelStudio.runOrchestrator", "title": "Novel Studio: Run Orchestrator Pipeline" },
       { "command": "novelStudio.exportLora", "title": "Novel Studio: Export LoRA JSONL" },
       { "command": "novelStudio.audiobookBatch", "title": "Novel Studio: Audiobook Batch" },
       { "command": "novelStudio.runPrompt", "title": "Novel Studio: Run Prompt Library" },
@@ -250,6 +261,7 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node out/test/pure.js",
     "test:integration": "npm run compile && node out/test/integration/run.js",
+    "orchestrate:ci": "node scripts/orchestrate-ci.mjs",
     "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "devDependencies": {

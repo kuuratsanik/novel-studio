@@ -40,6 +40,8 @@ v1.5 adds a **Workflow** tab (compile, HTML, EPUB, KDP zip), sidebar streaming, 
 
 v2.0 adds **tiered local models** (7B fast / 32B writer), generation cancel, editor streaming from Hub, hybrid RAG, manuscript graph, continuity quick-fixes, **Write Scene Pipeline**, outline sync v2, and PDF export.
 
+v2.1 adds the **Autopilot orchestrator** — coordinates bootstrap, wiki, graph, embeddings, analytics, compile, and publish across Ollama and local CLI tools. Runs automatically on open/save; use the **Autopilot** tab for full/publish pipelines.
+
 ```bash
 ollama pull qwen2.5:7b-instruct
 ollama pull qwen2.5:32b-instruct

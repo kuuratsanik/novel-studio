@@ -13,7 +13,12 @@ import { WikiLinkCompletionProvider, WikiLinkHoverProvider } from "./services/wi
 import { scheduleEmbeddingRebuild } from "./services/embeddingScheduler";
 import { invalidateMarkdownCache } from "./services/workspaceIo";
 import { ContinuityCodeActionProvider } from "./services/continuityFixes";
-import { saveManuscriptGraph } from "./services/manuscriptGraph";
+import {
+  getOrchestratorProgress,
+  runOrchestrator,
+  shouldOrchestrateOnOpen,
+  shouldOrchestrateOnSave,
+} from "./services/orchestrator";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -52,9 +57,13 @@ export function activate(context: vscode.ExtensionContext) {
     await status.refresh();
   }, 1200);
 
-  const graphOnSave = debounce(async () => {
-    await saveManuscriptGraph().catch(() => undefined);
-  }, 3000);
+  const orchestrateOnSave = debounce(async () => {
+    if (!shouldOrchestrateOnSave()) return;
+    if (getOrchestratorProgress().running) return;
+    await runOrchestrator("save", diagnostics).catch(() => undefined);
+    await status.refresh();
+    provider.refreshOrchestrator();
+  }, 5000);
 
   context.subscriptions.push(
     diagnostics.disposable,
@@ -92,6 +101,20 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.exportPdf", wrap(() => cmds.exportPdfCmd())),
     vscode.commands.registerCommand("novelStudio.cancelGeneration", wrap(async () => cmds.cancelGenerationCmd())),
     vscode.commands.registerCommand("novelStudio.writeScene", wrap(() => cmds.writeSceneCmd(text, keyManager, diagnostics))),
+    vscode.commands.registerCommand("novelStudio.runOrchestrator", wrap(async () => {
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "startup", description: "Bootstrap + infrastructure + wiki" },
+          { label: "save", description: "Graph, links, analytics, audit" },
+          { label: "full", description: "All maintenance tasks" },
+          { label: "publish", description: "Compile + HTML + PDF + EPUB + KDP zip" },
+        ],
+        { title: "Orchestrator profile" },
+      );
+      if (!pick) return;
+      await cmds.runOrchestratorCmd(pick.label as import("./services/orchestrator").OrchestratorProfile, diagnostics);
+      provider.refreshOrchestrator();
+    })),
     vscode.commands.registerCommand(
       "novelStudio.fixContinuity",
       wrap(async (...args: unknown[]) => {
@@ -148,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
         invalidateMarkdownCache();
         void auditIfAutomatic();
         scheduleEmbeddingRebuild(doc);
-        graphOnSave();
+        orchestrateOnSave();
         provider.refreshOnEditorChange();
       }
     }),
@@ -162,6 +185,11 @@ export function activate(context: vscode.ExtensionContext) {
     if (booted) {
       vscode.window.showInformationMessage("Novel Studio bootstrapped your workspace automatically.");
     }
+    if (shouldOrchestrateOnOpen()) {
+      await runOrchestrator("startup", diagnostics).catch(() => undefined);
+      provider.refreshOrchestrator();
+    }
+    await status.refresh();
   })();
 }
 

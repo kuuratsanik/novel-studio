@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0
+
+- **Orchestrator** coordinates all Novel Studio tasks across workspace + local infrastructure.
+- Profiles: `startup`, `save`, `full`, `publish` — run from **Autopilot** tab or command palette.
+- Auto-runs startup pipeline on workspace open; save pipeline debounced after markdown saves.
+- Infrastructure probe writes `compile/infrastructure.md` (Ollama, pandoc, zip, espeak).
+- Reports: `compile/orchestrator-report.md`, `.novel-studio/orchestrator-log.jsonl`.
+- CI: `npm run orchestrate:ci` validates tests + demo-novel fixture.
+
 ## 2.0.0
 
 ### Phase 1 — Local intelligence loop

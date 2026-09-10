@@ -205,6 +205,19 @@ export async function multiAgent(text: TextRouter, keys: KeyManager) {
   insert(final);
 }
 
+export async function runOrchestratorCmd(
+  profile: import("./services/orchestrator").OrchestratorProfile,
+  diagnostics?: ContinuityDiagnostics,
+) {
+  const { runOrchestrator } = await import("./services/orchestrator");
+  const result = await runOrchestrator(profile, diagnostics);
+  const errors = result.tasks.filter((t) => t.status === "error").length;
+  const ok = result.tasks.filter((t) => t.status === "ok").length;
+  vscode.window.showInformationMessage(
+    `Orchestrator (${profile}): ${ok} ok, ${errors} error(s). See compile/orchestrator-report.md`,
+  );
+}
+
 export async function writeSceneCmd(
   text: TextRouter,
   keys: KeyManager,

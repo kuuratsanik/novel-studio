@@ -10,6 +10,11 @@ import { ensureSceneContract } from "./services/autoContract";
 import { getAnalyticsSnapshot } from "./services/analytics";
 import { pickRoute } from "./commands";
 import { uriFor } from "./services/workspaceIo";
+import {
+  getOrchestratorProgress,
+  runOrchestrator,
+  OrchestratorProfile,
+} from "./services/orchestrator";
 
 export interface StudioHubDeps {
   keys: KeyManager;
@@ -39,6 +44,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview();
     void this._sendContract();
     void this._sendRoute();
+    void this._sendOrchestrator();
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       try {
@@ -173,6 +179,20 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             this._post({ type: "status", busy: false, message: "Wrote compile/analytics.md" });
             break;
           }
+          case "loadOrchestrator": {
+            await this._sendOrchestrator();
+            break;
+          }
+          case "orchestrate": {
+            const profile = String(data.profile || "full") as OrchestratorProfile;
+            this._post({ type: "orchestratorProgress", running: true, profile });
+            const result = await runOrchestrator(profile, this._deps.diagnostics, (task) => {
+              this._post({ type: "orchestratorTask", task });
+            });
+            this._post({ type: "orchestratorDone", result });
+            await this._sendOrchestrator();
+            break;
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -189,6 +209,15 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
   public refreshOnEditorChange(): void {
     void this._sendContract();
     void this._sendAnalytics();
+  }
+
+  public refreshOrchestrator(): void {
+    void this._sendOrchestrator();
+  }
+
+  private _sendOrchestrator() {
+    const p = getOrchestratorProgress();
+    this._post({ type: "orchestratorLoaded", progress: p });
   }
 
   private _post(payload: Record<string, unknown>) {
@@ -306,6 +335,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button class="tab" data-tab="contract">Contract</button>
     <button class="tab" data-tab="analytics">Analytics</button>
     <button class="tab" data-tab="workflow">Workflow</button>
+    <button class="tab" data-tab="autopilot">Autopilot</button>
   </div>
 
   <section id="section-tools" class="hub-section active">
@@ -411,6 +441,19 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button id="btnRefreshAnalytics" class="btn-secondary">Write compile/analytics.md</button>
   </section>
 
+  <section id="section-autopilot" class="hub-section">
+    <p class="hint">Coordinates all Novel Studio tasks across your workspace and local tools (Ollama, pandoc, zip).</p>
+    <div id="orchStatus" class="metric"><span>Status</span><strong id="orch_state">—</strong></div>
+    <div id="orchTaskList" style="font-size:11px;max-height:160px;overflow-y:auto;margin:8px 0;"></div>
+    <div class="workflow-grid">
+      <button data-orchestrate="startup">Startup</button>
+      <button data-orchestrate="save">On-save batch</button>
+      <button data-orchestrate="full">Full maintenance</button>
+      <button data-orchestrate="publish">Publish pipeline</button>
+    </div>
+    <p class="hint">Reports: <code>compile/orchestrator-report.md</code> · log: <code>.novel-studio/orchestrator-log.jsonl</code></p>
+  </section>
+
   <section id="section-workflow" class="hub-section">
     <p class="hint">One-click manuscript pipeline from the sidebar.</p>
     <div class="workflow-grid">
@@ -477,7 +520,12 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         document.getElementById('section-' + tab.dataset.tab).classList.add('active');
         if (tab.dataset.tab === 'contract') vscode.postMessage({ type: 'loadContract' });
         if (tab.dataset.tab === 'analytics') vscode.postMessage({ type: 'loadAnalytics' });
+        if (tab.dataset.tab === 'autopilot') vscode.postMessage({ type: 'loadOrchestrator' });
       });
+    });
+
+    document.querySelectorAll('[data-orchestrate]').forEach((btn) => {
+      btn.addEventListener('click', () => vscode.postMessage({ type: 'orchestrate', profile: btn.dataset.orchestrate }));
     });
 
     document.querySelectorAll('[data-action]').forEach((btn) => {
@@ -529,6 +577,22 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         document.getElementById('contractDraft').textContent = data.draft ? 'Contract for ' + data.draft : 'Open a drafts/*.md file.';
         document.getElementById('contractReady').textContent = data.ready ? '✓ Contract ready' : '✗ Contract incomplete';
         if (data.contract) fillContract(data.contract);
+      }
+      if (data.type === 'orchestratorLoaded' && data.progress) {
+        const p = data.progress;
+        document.getElementById('orch_state').textContent = p.running ? 'Running ' + (p.profile || '') + '…' : 'Idle';
+        const tasks = p.lastResult?.tasks || [];
+        document.getElementById('orchTaskList').innerHTML = tasks.length
+          ? tasks.map(t => '<div>' + (t.status === 'ok' ? '✓' : t.status === 'error' ? '✗' : '○') + ' ' + t.label + ': ' + t.message + '</div>').join('')
+          : '<div>No runs yet. Click a pipeline above.</div>';
+      }
+      if (data.type === 'orchestratorTask' && data.task) {
+        const t = data.task;
+        const el = document.getElementById('orchTaskList');
+        el.innerHTML += '<div>' + (t.status === 'ok' ? '✓' : t.status === 'error' ? '✗' : '○') + ' ' + t.label + ': ' + t.message + '</div>';
+      }
+      if (data.type === 'orchestratorDone') {
+        document.getElementById('orch_state').textContent = 'Idle — see compile/orchestrator-report.md';
       }
       if (data.type === 'analyticsLoaded' && data.snapshot) {
         const s = data.snapshot;
