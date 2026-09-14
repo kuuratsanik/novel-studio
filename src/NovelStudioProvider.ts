@@ -15,6 +15,8 @@ import {
   runOrchestrator,
   OrchestratorProfile,
 } from "./services/orchestrator";
+import { summarizeGraph } from "./services/graphExplorer";
+import { listPrompts } from "./services/prompts";
 
 export interface StudioHubDeps {
   keys: KeyManager;
@@ -202,6 +204,36 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             this._post({ type: "status", busy: false, message: "Unrestricted-only preset applied." });
             break;
           }
+          case "maximumPreset": {
+            await vscode.commands.executeCommand("novelStudio.applyMaximumLimitsPreset");
+            await this._sendRoute();
+            this._post({ type: "status", busy: false, message: "2026–2027 Maximum Limits preset applied." });
+            break;
+          }
+          case "loadGraph":
+          case "graphExport": {
+            const summary = await summarizeGraph();
+            if (data.type === "graphExport") {
+              const { graphToMarkdown } = await import("./services/graphExplorer");
+              const { writeWorkspaceFile } = await import("./services/workspaceIo");
+              await writeWorkspaceFile("compile/graph-summary.md", graphToMarkdown(summary));
+            }
+            this._post({ type: "graphLoaded", summary });
+            break;
+          }
+          case "loadPrompts": {
+            const names = await listPrompts();
+            this._post({ type: "promptsLoaded", names });
+            break;
+          }
+          case "runPrompt": {
+            const name = String(data.name || "");
+            if (!name) return;
+            const { pickPromptAndRun } = await import("./commands");
+            await pickPromptAndRun(this._deps.text, this._deps.keys, name);
+            this._post({ type: "status", busy: false, message: `Ran prompt: ${name}` });
+            break;
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -345,6 +377,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <button class="tab" data-tab="analytics">Analytics</button>
     <button class="tab" data-tab="workflow">Workflow</button>
     <button class="tab" data-tab="autopilot">Autopilot</button>
+    <button class="tab" data-tab="graph">Graph</button>
+    <button class="tab" data-tab="prompts">Prompts</button>
   </div>
 
   <section id="section-tools" class="hub-section active">
@@ -445,6 +479,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     <div class="progress"><span id="an_bar" style="width:0%"></span></div>
     <div class="metric"><span>Contracts ready</span><strong id="an_contracts">—</strong></div>
     <div class="metric"><span>Chapters</span><strong id="an_chapters">—</strong></div>
+    <div class="metric"><span>Streak</span><strong id="an_streak">—</strong></div>
+    <div class="metric"><span>Words today</span><strong id="an_today">—</strong></div>
     <h3>Chapters</h3>
     <div id="chapterList"></div>
     <button id="btnRefreshAnalytics" class="btn-secondary">Write compile/analytics.md</button>
@@ -461,7 +497,26 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       <button data-orchestrate="publish">Publish pipeline</button>
     </div>
     <button id="btnUnrestrictedPreset" class="btn-secondary" style="margin-top:8px;width:100%">Apply unrestricted-only preset</button>
-    <p class="hint">Local-only: Ollama + Piper/espeak + no cloud keys. Reports: <code>compile/orchestrator-report.md</code></p>
+    <button id="btnMaximumPreset" class="btn-secondary" style="margin-top:6px;width:100%">2026–2027 Maximum Limits preset</button>
+    <p class="hint">Maximum = unrestricted + deep pipeline + inline completions + grammar diagnostics. Run <strong>Maximum</strong> orchestrator for full local loop.</p>
+    <div class="workflow-grid" style="margin-top:8px">
+      <button data-orchestrate="maximum">Maximum pipeline</button>
+    </div>
+    <p class="hint">Reports: <code>compile/orchestrator-report.md</code></p>
+  </section>
+
+  <section id="section-graph" class="hub-section">
+    <p class="hint">Manuscript graph from state + drafts. Rebuild on save orchestrator.</p>
+    <div id="graphStats" class="metric"><span>Entities</span><strong id="graph_count">—</strong></div>
+    <div id="graphOrphans" style="font-size:11px;margin:8px 0;"></div>
+    <div id="graphChapters" style="font-size:11px;max-height:140px;overflow-y:auto;"></div>
+    <button id="btnRefreshGraph" class="btn-secondary">Write compile/graph-summary.md</button>
+  </section>
+
+  <section id="section-prompts" class="hub-section">
+    <p class="hint">Workspace prompts in <code>prompts/*.md</code></p>
+    <div id="promptList" style="font-size:11px;"></div>
+    <button id="btnRefreshPrompts" class="btn-secondary">Refresh prompt list</button>
   </section>
 
   <section id="section-workflow" class="hub-section">
@@ -534,6 +589,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         if (tab.dataset.tab === 'contract') vscode.postMessage({ type: 'loadContract' });
         if (tab.dataset.tab === 'analytics') vscode.postMessage({ type: 'loadAnalytics' });
         if (tab.dataset.tab === 'autopilot') vscode.postMessage({ type: 'loadOrchestrator' });
+        if (tab.dataset.tab === 'graph') vscode.postMessage({ type: 'loadGraph' });
+        if (tab.dataset.tab === 'prompts') vscode.postMessage({ type: 'loadPrompts' });
       });
     });
 
@@ -546,6 +603,9 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
     });
     document.getElementById('btnPickModel').addEventListener('click', () => vscode.postMessage({ type: 'pickModel' }));
     document.getElementById('btnUnrestrictedPreset').addEventListener('click', () => vscode.postMessage({ type: 'unrestrictedPreset' }));
+    document.getElementById('btnMaximumPreset').addEventListener('click', () => vscode.postMessage({ type: 'maximumPreset' }));
+    document.getElementById('btnRefreshGraph').addEventListener('click', () => vscode.postMessage({ type: 'graphExport' }));
+    document.getElementById('btnRefreshPrompts').addEventListener('click', () => vscode.postMessage({ type: 'loadPrompts' }));
     document.getElementById('btnRefreshAnalytics').addEventListener('click', () => vscode.postMessage({ type: 'refreshAnalyticsFile' }));
 
     function fillContract(c) {
@@ -608,6 +668,27 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       if (data.type === 'orchestratorDone') {
         document.getElementById('orch_state').textContent = 'Idle — see compile/orchestrator-report.md';
       }
+      if (data.type === 'graphLoaded' && data.summary) {
+        const g = data.summary;
+        document.getElementById('graph_count').textContent = (g.characters?.length || 0) + ' chars · ' + (g.chapters?.length || 0) + ' ch';
+        document.getElementById('graphOrphans').innerHTML = (g.orphanCharacters || []).length
+          ? '<strong>Orphans:</strong> ' + g.orphanCharacters.join(', ')
+          : 'No orphan characters.';
+        document.getElementById('graphChapters').innerHTML = (g.chapters || []).map(c =>
+          '<div data-rel="' + (c.path || '') + '">' + c.name + '</div>'
+        ).join('') || 'No chapters in graph.';
+        document.querySelectorAll('#graphChapters [data-rel]').forEach((row) => {
+          if (row.dataset.rel) row.addEventListener('click', () => vscode.postMessage({ type: 'openChapter', rel: row.dataset.rel }));
+        });
+      }
+      if (data.type === 'promptsLoaded' && data.names) {
+        document.getElementById('promptList').innerHTML = data.names.map(n =>
+          '<div style="cursor:pointer;margin:4px 0" data-prompt="' + n + '">▸ ' + n + '</div>'
+        ).join('');
+        document.querySelectorAll('#promptList [data-prompt]').forEach((row) => {
+          row.addEventListener('click', () => vscode.postMessage({ type: 'runPrompt', name: row.dataset.prompt }));
+        });
+      }
       if (data.type === 'analyticsLoaded' && data.snapshot) {
         const s = data.snapshot;
         document.getElementById('an_words').textContent = s.totalWords.toLocaleString();
@@ -615,6 +696,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
         document.getElementById('an_bar').style.width = Math.min(100, s.progressPct) + '%';
         document.getElementById('an_contracts').textContent = s.contractsReady + '/' + s.draftCount;
         document.getElementById('an_chapters').textContent = String(s.draftCount);
+        document.getElementById('an_streak').textContent = (s.streak ?? 0) + ' day(s)';
+        document.getElementById('an_today').textContent = String(s.todayWords ?? 0);
         document.getElementById('chapterList').innerHTML = (s.chapters || []).map(c =>
           '<div data-rel="' + c.rel + '">' + c.rel.replace('drafts/', '') + ' — ' + c.words + 'w · ' + c.dialoguePct + '% dlg</div>'
         ).join('') || '<div>No drafts yet.</div>';

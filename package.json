@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -192,6 +192,36 @@
           "type": "string",
           "default": "http://127.0.0.1:8081/v2/check",
           "description": "LanguageTool HTTP API endpoint for optional grammar checks."
+        },
+        "novelStudio.deepModel": {
+          "type": "string",
+          "default": "qwen2.5:32b-instruct",
+          "description": "Deep-tier local model for chapter generation and multi-pass scene pipeline."
+        },
+        "novelStudio.deepPipeline": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scene pipeline: writer → editor → continuity fix (multi-pass)."
+        },
+        "novelStudio.grammarDiagnostics": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show grammar/style issues in the Problems panel while editing."
+        },
+        "novelStudio.languageToolLint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include LanguageTool results in grammar lint and diagnostics."
+        },
+        "novelStudio.sessionAnalytics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track daily word counts and writing streak in Analytics."
+        },
+        "novelStudio.audiobookBatchAll": {
+          "type": "boolean",
+          "default": true,
+          "description": "Audiobook Batch narrates all draft chapters (not just selection)."
         }
       }
     },
@@ -287,7 +317,9 @@
       { "command": "novelStudio.applyUnrestrictedPreset", "title": "Novel Studio: Apply Unrestricted-Only Preset" },
       { "command": "novelStudio.grammarLint", "title": "Novel Studio: Grammar & Style Lint" },
       { "command": "novelStudio.exportTypst", "title": "Novel Studio: Export Typst Manuscript" },
-      { "command": "novelStudio.chapterTimeline", "title": "Novel Studio: Chapter Timeline" }
+      { "command": "novelStudio.chapterTimeline", "title": "Novel Studio: Chapter Timeline" },
+      { "command": "novelStudio.applyMaximumLimitsPreset", "title": "Novel Studio: Apply 2026–2027 Maximum Limits Preset" },
+      { "command": "novelStudio.graphExplorer", "title": "Novel Studio: Manuscript Graph Explorer" }
     ]
   },
   "scripts": {

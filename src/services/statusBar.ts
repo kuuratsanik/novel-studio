@@ -3,6 +3,7 @@ import { KeyManager } from "./keyManager";
 import { loadContract, contractReady, currentDraftRel } from "./contracts";
 import { automationSettings } from "./automation";
 import { isUnrestrictedOnly } from "./unrestrictedMode";
+import { isMaximumLimitsMode } from "./maximumLimits";
 
 export class StudioStatusBar {
   private readonly item: vscode.StatusBarItem;
@@ -35,7 +36,7 @@ export class StudioStatusBar {
     const cfg = vscode.workspace.getConfiguration("novelStudio");
     const provider = cfg.get<string>("defaultProvider") || "auto";
     const auto = automationSettings().fullyAutomatic ? "auto" : "manual";
-    const mode = isUnrestrictedOnly() ? "local-only" : auto;
+    const mode = isMaximumLimitsMode() ? "MAX" : isUnrestrictedOnly() ? "local-only" : auto;
     this.item.text = `$(book) ${words}w · ${contract} · ${this.flags} flags · ${mode} · ${provider}`;
     this.item.tooltip = "Novel Studio — click to audit continuity";
   }

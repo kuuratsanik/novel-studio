@@ -17,6 +17,11 @@ import { probeLocalTts } from "./localTts";
 import { probeLanguageTool } from "./languageToolLint";
 import { exportEpub } from "./epubExport";
 import { publishPackage } from "./publish";
+import { batchNarrateChapters } from "./audiobookBatch";
+import { speakLocal } from "./localTts";
+import { summarizeGraph, graphToMarkdown } from "./graphExplorer";
+import { runEval } from "./evalHarness";
+import { archiveProject } from "./archive";
 import { auditProse } from "./continuity";
 import { ContinuityDiagnostics } from "./diagnostics";
 import { execFile } from "child_process";
@@ -24,7 +29,7 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
-export type OrchestratorProfile = "startup" | "save" | "full" | "publish" | "ci";
+export type OrchestratorProfile = "startup" | "save" | "full" | "publish" | "maximum" | "ci";
 
 export interface OrchestratorTaskResult {
   id: string;
@@ -257,8 +262,42 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
     {
       id: "publish",
       label: "Publish / KDP zip",
-      profiles: ["publish"],
+      profiles: ["publish", "maximum"],
       run: async () => publishPackage(),
+    },
+    {
+      id: "graph-summary",
+      label: "Graph summary",
+      profiles: ["full", "maximum"],
+      run: async () => {
+        const summary = await summarizeGraph();
+        await writeWorkspaceFile("compile/graph-summary.md", graphToMarkdown(summary));
+        return `${summary.characters.length} chars, ${summary.orphanCharacters.length} orphan(s)`;
+      },
+    },
+    {
+      id: "eval",
+      label: "Eval harness",
+      profiles: ["maximum"],
+      run: async () => {
+        const report = await runEval();
+        return report.slice(0, 80);
+      },
+    },
+    {
+      id: "archive",
+      label: "Archive workspace",
+      profiles: ["maximum"],
+      run: async () => archiveProject(),
+    },
+    {
+      id: "audiobook",
+      label: "Audiobook batch",
+      profiles: ["maximum"],
+      run: async () => {
+        if (!cfg().get<boolean>("localTtsFirst")) return "skipped (localTtsFirst off)";
+        return batchNarrateChapters((text, slug) => speakLocal(text, slug).then((r) => r || Promise.reject(new Error("TTS failed"))));
+      },
     },
   ];
 }
@@ -275,7 +314,12 @@ export async function runOrchestrator(
   running = true;
   const localUrl = cfg().get<string>("localTextUrl") || "http://127.0.0.1:11434";
   const ollamaUp = await probeLocalEngine(localUrl);
-  const tasks = buildTasks(diagnostics).filter((t) => t.profiles.includes(profile));
+  const tasks = buildTasks(diagnostics).filter((t) => {
+    if (profile === "maximum") {
+      return t.profiles.includes("maximum") || t.profiles.includes("full") || t.profiles.includes("publish");
+    }
+    return t.profiles.includes(profile);
+  });
   const results: OrchestratorTaskResult[] = [];
 
   progress = { running: true, profile, completed: 0, total: tasks.length };

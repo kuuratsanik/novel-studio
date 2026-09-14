@@ -30,6 +30,15 @@ export async function packContext(opts: {
     chunks.push(bibleLockPrompt(bible, opts.allowException));
     if (bible.text) chunks.push(bible.text.slice(0, 4000));
   }
+  if (opts.useStyle) {
+    try {
+      const files = await listMarkdown();
+      const style = files.find((f) => f.rel === "codex/style.md" || f.rel === "codex/voice.md");
+      if (style?.text) chunks.push(`Style guide:\n${style.text.slice(0, 2000)}`);
+    } catch {
+      // optional style file
+    }
+  }
   const state = await loadState();
   chunks.push(statePrompt(state));
   const rel = currentDraftRel();

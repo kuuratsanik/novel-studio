@@ -11,6 +11,7 @@ import { ContinuityDiagnostics } from "./diagnostics";
 import { contractReady, currentDraftRel, loadContract } from "./contracts";
 import { ensureSceneContract } from "./autoContract";
 import { StreamInserter } from "./streamInserter";
+import { ModelTask } from "./modelDefaults";
 
 export type StudioTool =
   | "storyGen"
@@ -21,6 +22,18 @@ export type StudioTool =
   | "plotTwist";
 
 const PROSE_TOOLS = new Set<StudioTool>(["storyGen", "dialogueGen"]);
+
+const STORY_MODE_SYSTEM: Record<string, string> = {
+  scene: "Write one scene of fiction prose (400–900 words). Advance the beat. No outline.",
+  chapter: "Write a full chapter section (1200–2500 words). Use scene breaks with *** between beats.",
+  beats: "Output 5–8 numbered scene beats only. Each beat is one sentence. No prose yet.",
+};
+
+function storyTask(mode?: string): ModelTask {
+  if (mode === "beats") return "fast";
+  if (mode === "chapter") return "deep";
+  return "writer";
+}
 
 const TOOL_SYSTEM: Record<StudioTool, string> = {
   storyGen: "Write fiction prose only. Match the series voice. No meta commentary or outlines unless asked.",
@@ -152,7 +165,14 @@ export async function generateFromTool(
   const prompt = assembleToolPrompt(tool, fields);
   if (!prompt.trim()) throw new Error("Fill at least one field before generating.");
 
-  const system = `${await loadPrompt(tool === "rephraseGen" ? "rewrite" : "continue")}\n${TOOL_SYSTEM[tool]}`;
+  const modeHint = tool === "storyGen" && fields.mode ? STORY_MODE_SYSTEM[fields.mode] || "" : "";
+  const system = [
+    await loadPrompt(tool === "rephraseGen" ? "rewrite" : "continue"),
+    TOOL_SYSTEM[tool],
+    modeHint,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const auto = automationSettings();
   const streamOn = vscode.workspace.getConfiguration("novelStudio").get<boolean>("streamGeneration") ?? true;
   const ed = vscode.window.activeTextEditor;
@@ -171,7 +191,8 @@ export async function generateFromTool(
       }
     : undefined;
 
-  const output = await generatePacked(text, keys, prompt, system, combinedOnToken, "writer");
+  const task = tool === "storyGen" ? storyTask(fields.mode) : "writer";
+  const output = await generatePacked(text, keys, prompt, system, combinedOnToken, task);
 
   let route = describeRoute(tool, fields);
   if (streamToEditor && sink) {

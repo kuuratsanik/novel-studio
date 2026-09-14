@@ -51,6 +51,7 @@ export function runPureTests(): void {
 
   assert(resolveModelForTask("ollama", "fast", "fast-m", "writer-m") === "fast-m", "fast tier");
   assert(resolveModelForTask("ollama", "writer", "fast-m", "writer-m") === "writer-m", "writer tier");
+  assert(resolveModelForTask("ollama", "deep", "fast-m", "writer-m", "deep-m") === "deep-m", "deep tier");
 
   const parsed = parseJsonLoose<{ goal: string }>('{"goal":"test"}');
   assert(parsed?.goal === "test", "json loose");

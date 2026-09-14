@@ -44,6 +44,8 @@ v2.1 adds the **Autopilot orchestrator** — coordinates bootstrap, wiki, graph,
 
 v2.2 adds **unrestricted-only mode** (local Ollama + Piper/espeak TTS, no cloud), grammar/style lint, Typst export, chapter timeline, and optional inline completions from the fast model.
 
+**v3.0 — 2026–2027 Absolute Maximum Limits** completes the local loop: deep multi-pass scene pipeline, RAG-aware inline completions, LanguageTool diagnostics, Graph + Prompts Hub tabs, publish pack v3, audiobook batch, workspace archive, session streak analytics, and the **Maximum** orchestrator profile. Apply via Autopilot → **2026–2027 Maximum Limits preset**.
+
 ```bash
 ollama pull qwen2.5:7b-instruct
 ollama pull qwen2.5:32b-instruct

@@ -3,6 +3,7 @@ import { dialogueRatio, wordCount } from "./proseStats";
 import { loadContract, contractReady } from "./contracts";
 import { draftSortKey } from "./frontmatter";
 import { loadStudioConfig } from "./studioConfig";
+import { sessionSummary } from "./sessionAnalytics";
 
 export interface AnalyticsSnapshot {
   totalWords: number;
@@ -12,6 +13,8 @@ export interface AnalyticsSnapshot {
   contractsReady: number;
   codexFiles: number;
   chapters: { rel: string; words: number; dialoguePct: number }[];
+  streak?: number;
+  todayWords?: number;
 }
 
 export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
@@ -36,6 +39,8 @@ export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
       dialoguePct: Math.round(dialogueRatio(f.text) * 100),
     }));
 
+  const session = await sessionSummary(totalWords);
+
   return {
     totalWords,
     wordTarget: target,
@@ -44,6 +49,8 @@ export async function getAnalyticsSnapshot(): Promise<AnalyticsSnapshot> {
     contractsReady,
     codexFiles: files.length - drafts.length,
     chapters,
+    streak: session.streak,
+    todayWords: session.todayWords,
   };
 }
 
@@ -60,6 +67,8 @@ export async function writeAnalytics(): Promise<void> {
     `| Progress | ${snap.progressPct}% |`,
     `| Contracts ready | ${snap.contractsReady}/${snap.draftCount} |`,
     `| Codex / other md | ${snap.codexFiles} |`,
+    `| Writing streak | ${snap.streak ?? 0} day(s) |`,
+    `| Words today | ${snap.todayWords ?? 0} |`,
     "",
     "## Per chapter",
     "",

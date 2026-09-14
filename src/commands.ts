@@ -47,6 +47,7 @@ export async function pickRoute(
   task: ModelTask = "writer",
 ): Promise<{ provider: string; model: string; localUrl: string }> {
   const cfg = vscode.workspace.getConfiguration("novelStudio");
+  const deepModel = cfg.get<string>("deepModel") || cfg.get<string>("writerModel") || "qwen2.5:32b-instruct";
   if (isUnrestrictedOnly()) {
     const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
     const fastModel = cfg.get<string>("fastModel") || "qwen2.5:7b-instruct";
@@ -55,7 +56,7 @@ export async function pickRoute(
     const provider = forced === "kobold" ? "kobold" : "ollama";
     return {
       provider,
-      model: resolveModelForTask(provider, task, fastModel, writerModel),
+      model: resolveModelForTask(provider, task, fastModel, writerModel, deepModel),
       localUrl,
     };
   }
@@ -92,7 +93,7 @@ export async function pickRoute(
   }
 
   const model = LOCAL_TEXT_PROVIDERS.has(provider)
-    ? resolveModelForTask(provider, task, fastModel, writerModel)
+    ? resolveModelForTask(provider, task, fastModel, writerModel, deepModel)
     : resolveTextModel(provider, defaultModel || "auto");
 
   return { provider, model, localUrl };
@@ -110,6 +111,12 @@ export function cancelGenerationCmd(): void {
 export async function applyUnrestrictedPresetCmd(): Promise<void> {
   const keys = await applyUnrestrictedPreset();
   vscode.window.showInformationMessage(`Unrestricted preset applied (${keys.length} settings). Use Ollama locally.`);
+}
+
+export async function applyMaximumLimitsPresetCmd(): Promise<void> {
+  const { applyMaximumLimitsPreset } = await import("./services/maximumLimits");
+  const keys = await applyMaximumLimitsPreset();
+  vscode.window.showInformationMessage(`2026–2027 Maximum Limits preset applied (${keys.length} settings).`);
 }
 
 export async function narrateWithFallback(audio: AudioService, src: string): Promise<string> {
@@ -300,9 +307,27 @@ export async function exportLora() {
 }
 
 export async function batchAudiobook(audio: AudioService) {
+  const cfg = vscode.workspace.getConfiguration("novelStudio");
+  const batchAll = cfg.get<boolean>("audiobookBatchAll") ?? true;
+  if (batchAll) {
+    const { batchNarrateChapters } = await import("./services/audiobookBatch");
+    const msg = await batchNarrateChapters((text, slug) => narrateWithFallback(audio, text));
+    vscode.window.showInformationMessage(msg);
+    return;
+  }
   const src = selection() || activeText();
   const rel = await narrateWithFallback(audio, src);
   insert(`[narration](${rel})`);
+}
+
+export async function graphExplorerCmd() {
+  const { summarizeGraph, graphToMarkdown } = await import("./services/graphExplorer");
+  const { writeWorkspaceFile } = await import("./services/workspaceIo");
+  const summary = await summarizeGraph();
+  await writeWorkspaceFile("compile/graph-summary.md", graphToMarkdown(summary));
+  vscode.window.showInformationMessage(
+    `Graph: ${summary.characters.length} characters, ${summary.chapters.length} chapters, ${summary.orphanCharacters.length} orphan(s)`,
+  );
 }
 
 export async function grammarLintCmd() {
@@ -322,9 +347,9 @@ export async function chapterTimelineCmd() {
   await openChapterTimeline();
 }
 
-export async function pickPromptAndRun(text: TextRouter, keys: KeyManager) {
+export async function pickPromptAndRun(text: TextRouter, keys: KeyManager, name?: string) {
   const names = await listPrompts();
-  const pick = await vscode.window.showQuickPick(names, { title: "Prompt" });
+  const pick = name || (await vscode.window.showQuickPick(names, { title: "Prompt" }));
   if (!pick) return;
   const out = await generatePacked(text, keys, selection() || activeText().slice(-1200), await loadPrompt(pick));
   insert(out);

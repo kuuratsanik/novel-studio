@@ -13,6 +13,7 @@ export const DEFAULT_TEXT_MODELS: Record<string, string> = {
 
 export const DEFAULT_FAST_MODEL = "qwen2.5:7b-instruct";
 export const DEFAULT_WRITER_MODEL = "qwen2.5:32b-instruct";
+export const DEFAULT_DEEP_MODEL = "qwen2.5:32b-instruct";
 
 export const LOCAL_TEXT_PROVIDERS = new Set(["ollama", "kobold"]);
 
@@ -28,11 +29,18 @@ export function resolveTextModel(provider: string, model?: string): string {
   return DEFAULT_TEXT_MODELS[provider] ?? DEFAULT_TEXT_MODELS.ollama;
 }
 
-export function resolveModelForTask(provider: string, task: ModelTask, fastModel: string, writerModel: string): string {
+export function resolveModelForTask(
+  provider: string,
+  task: ModelTask,
+  fastModel: string,
+  writerModel: string,
+  deepModel?: string,
+): string {
   if (!LOCAL_TEXT_PROVIDERS.has(provider)) {
     return resolveTextModel(provider, "auto");
   }
   if (task === "fast") return fastModel || DEFAULT_FAST_MODEL;
+  if (task === "deep") return deepModel || writerModel || DEFAULT_DEEP_MODEL;
   return writerModel || DEFAULT_WRITER_MODEL;
 }
 

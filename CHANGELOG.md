@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.0.0 — 2026–2027 Absolute Maximum Limits
+
+### Phase 5 — Complete the local loop
+- **Maximum Limits preset**: one-click local-first config (unrestricted + deep pipeline + inline completions + grammar diagnostics).
+- **Deep model tier** (`novelStudio.deepModel`) for chapter mode and multi-pass scene pipeline (`deepPipeline`).
+- Scene pipeline: writer → editor → continuity fix when deep mode is on.
+- Story Hub modes behave distinctly: scene / chapter / beats (different model tiers and prompts).
+
+### Intelligence at maximum
+- **RAG-aware inline completions** with bible, contract, style guide, and embedding context.
+- **LanguageTool wired** into grammar lint, orchestrator, and Problems panel (`grammarDiagnostics`, `languageToolLint`).
+- Graph-enriched continuity: orphan character detection.
+- **Manuscript Graph tab** in Studio Hub + `compile/graph-summary.md`.
+
+### Publish & production
+- **Publish pack v3**: EPUB, PDF, Typst, grammar report, analytics, cover image detection in KDP zip.
+- **Real workspace archive** (`zip` excluding node_modules/.git).
+- **Audiobook batch**: narrate all chapters with manifest (`compile/audiobook-manifest.json`).
+- **Eval harness v2**: per-chapter contract compliance scoring.
+
+### Analytics & orchestration
+- **Session analytics**: daily words + writing streak in Analytics tab.
+- **Maximum orchestrator profile**: runs full + publish + archive + eval + audiobook batch.
+- **Prompts tab** in Studio Hub to browse and run `prompts/*.md`.
+- Status bar shows `MAX` when Maximum Limits mode is active.
+
 ## 2.2.0
 
 - **Unrestricted-only mode** (`novelStudio.unrestrictedOnly`) blocks cloud providers; one-click preset in Autopilot tab.

@@ -189,6 +189,14 @@ export async function auditProse(prose: string): Promise<ContinuityFlag[]> {
           matchText: e.name,
         });
       }
+      const everAppears = graph.edges.some((edge) => edge.from === e.id && edge.rel === "appears-in");
+      if (!everAppears && new RegExp(`\\b${e.name}\\b`).test(prose)) {
+        flags.push({
+          message: `${e.name} is in state/codex but has never appeared in any chapter (orphan character).`,
+          severity: "information",
+          matchText: e.name,
+        });
+      }
     }
   }
 
