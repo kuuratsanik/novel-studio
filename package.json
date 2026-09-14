@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -161,6 +161,37 @@
           "type": "boolean",
           "default": true,
           "description": "Run save orchestrator (graph, links, analytics) after markdown saves."
+        },
+        "novelStudio.unrestrictedOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Block cloud providers; use only local Ollama/Kobold, Piper/espeak TTS, and offline tools."
+        },
+        "novelStudio.localTtsFirst": {
+          "type": "boolean",
+          "default": true,
+          "description": "Try Piper, espeak, or pico2wave before cloud narration."
+        },
+        "novelStudio.localTtsEngine": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "piper", "espeak", "pico2wave"],
+          "description": "Preferred local TTS engine (auto tries all)."
+        },
+        "novelStudio.piperModel": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Piper .onnx voice model (workspace-relative or absolute)."
+        },
+        "novelStudio.inlineCompletions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ghost-text inline completions from fast local model while typing markdown."
+        },
+        "novelStudio.languageToolUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8081/v2/check",
+          "description": "LanguageTool HTTP API endpoint for optional grammar checks."
         }
       }
     },
@@ -252,7 +283,11 @@
       { "command": "novelStudio.wikiIndex", "title": "Novel Studio: Build Wiki Index" },
       { "command": "novelStudio.rebuildEmbeddings", "title": "Novel Studio: Rebuild Embedding Index" },
       { "command": "novelStudio.exportEpub", "title": "Novel Studio: Export EPUB" },
-      { "command": "novelStudio.compareSnapshot", "title": "Novel Studio: Compare Snapshot to Trunk" }
+      { "command": "novelStudio.compareSnapshot", "title": "Novel Studio: Compare Snapshot to Trunk" },
+      { "command": "novelStudio.applyUnrestrictedPreset", "title": "Novel Studio: Apply Unrestricted-Only Preset" },
+      { "command": "novelStudio.grammarLint", "title": "Novel Studio: Grammar & Style Lint" },
+      { "command": "novelStudio.exportTypst", "title": "Novel Studio: Export Typst Manuscript" },
+      { "command": "novelStudio.chapterTimeline", "title": "Novel Studio: Chapter Timeline" }
     ]
   },
   "scripts": {

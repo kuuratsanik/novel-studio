@@ -98,12 +98,15 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
               html: "novelStudio.exportHtml",
               pdf: "novelStudio.exportPdf",
               epub: "novelStudio.exportEpub",
+              typst: "novelStudio.exportTypst",
               outline: "novelStudio.outlineSync",
               embeddings: "novelStudio.rebuildEmbeddings",
               snapshot: "novelStudio.compareSnapshot",
               publish: "novelStudio.publishPackage",
               audit: "novelStudio.auditContinuity",
               writeScene: "novelStudio.writeScene",
+              grammar: "novelStudio.grammarLint",
+              timeline: "novelStudio.chapterTimeline",
             };
             const cmd = map[String(data.action)];
             if (!cmd) throw new Error(`Unknown workflow action: ${data.action}`);
@@ -191,6 +194,12 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
             });
             this._post({ type: "orchestratorDone", result });
             await this._sendOrchestrator();
+            break;
+          }
+          case "unrestrictedPreset": {
+            await vscode.commands.executeCommand("novelStudio.applyUnrestrictedPreset");
+            await this._sendRoute();
+            this._post({ type: "status", busy: false, message: "Unrestricted-only preset applied." });
             break;
           }
         }
@@ -451,7 +460,8 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       <button data-orchestrate="full">Full maintenance</button>
       <button data-orchestrate="publish">Publish pipeline</button>
     </div>
-    <p class="hint">Reports: <code>compile/orchestrator-report.md</code> · log: <code>.novel-studio/orchestrator-log.jsonl</code></p>
+    <button id="btnUnrestrictedPreset" class="btn-secondary" style="margin-top:8px;width:100%">Apply unrestricted-only preset</button>
+    <p class="hint">Local-only: Ollama + Piper/espeak + no cloud keys. Reports: <code>compile/orchestrator-report.md</code></p>
   </section>
 
   <section id="section-workflow" class="hub-section">
@@ -467,6 +477,9 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       <button data-action="audit">Continuity audit</button>
       <button data-action="writeScene">Scene pipeline</button>
       <button data-action="pdf">Export PDF</button>
+      <button data-action="typst">Export Typst</button>
+      <button data-action="grammar">Grammar lint</button>
+      <button data-action="timeline">Chapter timeline</button>
     </div>
   </section>
 
@@ -532,6 +545,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       btn.addEventListener('click', () => vscode.postMessage({ type: 'workflow', action: btn.dataset.action }));
     });
     document.getElementById('btnPickModel').addEventListener('click', () => vscode.postMessage({ type: 'pickModel' }));
+    document.getElementById('btnUnrestrictedPreset').addEventListener('click', () => vscode.postMessage({ type: 'unrestrictedPreset' }));
     document.getElementById('btnRefreshAnalytics').addEventListener('click', () => vscode.postMessage({ type: 'refreshAnalyticsFile' }));
 
     function fillContract(c) {

@@ -42,10 +42,15 @@ v2.0 adds **tiered local models** (7B fast / 32B writer), generation cancel, edi
 
 v2.1 adds the **Autopilot orchestrator** — coordinates bootstrap, wiki, graph, embeddings, analytics, compile, and publish across Ollama and local CLI tools. Runs automatically on open/save; use the **Autopilot** tab for full/publish pipelines.
 
+v2.2 adds **unrestricted-only mode** (local Ollama + Piper/espeak TTS, no cloud), grammar/style lint, Typst export, chapter timeline, and optional inline completions from the fast model.
+
 ```bash
 ollama pull qwen2.5:7b-instruct
 ollama pull qwen2.5:32b-instruct
 ollama pull nomic-embed-text
+# optional local TTS
+sudo apt install espeak libttspico-utils
+# optional: piper + set novelStudio.piperModel to your .onnx voice
 ```
 
 ## Routing

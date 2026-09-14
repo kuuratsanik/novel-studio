@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.0
+
+- **Unrestricted-only mode** (`novelStudio.unrestrictedOnly`) blocks cloud providers; one-click preset in Autopilot tab.
+- **Local TTS chain**: Piper → espeak → pico2wave with `localTtsFirst`, `localTtsEngine`, `piperModel`.
+- Narration commands use local TTS before cloud when available.
+- **Grammar & style lint** writes `compile/grammar-lint.md`; runs in save/full orchestrator profiles.
+- **Export Typst** (`compile/manuscript.typ`) for print-ready PDF via `typst compile`.
+- **Chapter timeline** quick-pick to jump between draft chapters.
+- **Inline completions** from fast local model (`novelStudio.inlineCompletions`).
+- Infrastructure probe adds Piper, pico2wave, and LanguageTool (`novelStudio.languageToolUrl`).
+- Status bar shows `local-only` when unrestricted mode is active.
+
 ## 2.1.0
 
 - **Orchestrator** coordinates all Novel Studio tasks across workspace + local infrastructure.

@@ -19,6 +19,7 @@ import {
   shouldOrchestrateOnOpen,
   shouldOrchestrateOnSave,
 } from "./services/orchestrator";
+import { NovelInlineCompletionProvider } from "./services/inlineCompletions";
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,6 +77,10 @@ export function activate(context: vscode.ExtensionContext) {
       { language: "markdown" },
       new ContinuityCodeActionProvider(text, keyManager),
       { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] },
+    ),
+    vscode.languages.registerInlineCompletionItemProvider(
+      { language: "markdown" },
+      new NovelInlineCompletionProvider(text, keyManager),
     ),
     vscode.commands.registerCommand("novelStudio.setKey", wrap(async () => {
       const service = await vscode.window.showQuickPick([...SECRET_SERVICES], { title: "Which service key?" });
@@ -137,9 +142,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.compareSnapshot", wrap(() => cmds.compareSnapshotCmd())),
     vscode.commands.registerCommand("novelStudio.narrateChapter", wrap(async () => {
       const src = cmds.selection() || cmds.activeText();
-      const rel = await audio.speak(src.slice(0, 4000), "openai");
+      const rel = await cmds.narrateWithFallback(audio, src);
       cmds.insert(`[narration](${rel})`);
     })),
+    vscode.commands.registerCommand("novelStudio.applyUnrestrictedPreset", wrap(() => cmds.applyUnrestrictedPresetCmd())),
+    vscode.commands.registerCommand("novelStudio.grammarLint", wrap(() => cmds.grammarLintCmd())),
+    vscode.commands.registerCommand("novelStudio.exportTypst", wrap(() => cmds.exportTypstCmd())),
+    vscode.commands.registerCommand("novelStudio.chapterTimeline", wrap(() => cmds.chapterTimelineCmd())),
     vscode.commands.registerCommand("novelStudio.revisionMode", wrap(() => cmds.revisionPass(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.seedState", wrap(() => cmds.seedState())),
     vscode.commands.registerCommand("novelStudio.seedContract", wrap(() => cmds.seedContractCmd())),

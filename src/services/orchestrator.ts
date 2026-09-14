@@ -11,7 +11,10 @@ import { rebuildEmbeddings } from "./embeddings";
 import { buildVoiceModels } from "./characterVoice";
 import { syncOutlineToDrafts } from "./outlineSync";
 import { writeAnalytics } from "./analytics";
-import { compileManuscript, exportHtml, exportPdf } from "./compiler";
+import { compileManuscript, exportHtml, exportPdf, exportTypst } from "./compiler";
+import { writeGrammarReport } from "./grammarLint";
+import { probeLocalTts } from "./localTts";
+import { probeLanguageTool } from "./languageToolLint";
 import { exportEpub } from "./epubExport";
 import { publishPackage } from "./publish";
 import { auditProse } from "./continuity";
@@ -101,7 +104,8 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
         const ollama = await probeLocalEngine(localUrl);
         const pandoc = await probeBinary("pandoc");
         const zip = await probeBinary("zip", ["-h"]);
-        const espeak = await probeBinary("espeak", ["--version"]);
+        const tts = await probeLocalTts();
+        const languageTool = await probeLanguageTool();
         const lines = [
           "# Infrastructure",
           "",
@@ -110,11 +114,14 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
           `| Ollama @ ${localUrl} | ${ollama ? "yes" : "no"} |`,
           `| pandoc | ${pandoc ? "yes" : "no"} |`,
           `| zip | ${zip ? "yes" : "no"} |`,
-          `| espeak | ${espeak ? "yes" : "no"} |`,
+          `| Piper TTS | ${tts.piper ? "yes" : "no"} |`,
+          `| espeak | ${tts.espeak ? "yes" : "no"} |`,
+          `| pico2wave | ${tts.pico2wave ? "yes" : "no"} |`,
+          `| LanguageTool | ${languageTool ? "yes" : "no"} |`,
           "",
         ];
         await writeWorkspaceFile("compile/infrastructure.md", lines.join("\n"));
-        return `ollama=${ollama} pandoc=${pandoc} zip=${zip}`;
+        return `ollama=${ollama} pandoc=${pandoc} zip=${zip} tts=${tts.piper || tts.espeak}`;
       },
     },
     {
@@ -133,6 +140,15 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
       profiles: ["save", "full"],
       run: async () => {
         const dest = await writeBrokenLinkReport();
+        return `Wrote ${dest}`;
+      },
+    },
+    {
+      id: "grammar-lint",
+      label: "Grammar & style lint",
+      profiles: ["save", "full"],
+      run: async () => {
+        const dest = await writeGrammarReport();
         return `Wrote ${dest}`;
       },
     },
@@ -231,6 +247,12 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
       label: "Export EPUB",
       profiles: ["publish"],
       run: async () => exportEpub(),
+    },
+    {
+      id: "typst",
+      label: "Export Typst",
+      profiles: ["publish"],
+      run: async () => exportTypst(),
     },
     {
       id: "publish",

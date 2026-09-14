@@ -80,3 +80,44 @@ export async function exportPdf(): Promise<string> {
     return "compile/pdf-README.md";
   }
 }
+
+function escapeTypst(text: string): string {
+  return text.replace(/[#$\\]/g, "\\$&");
+}
+
+export async function exportTypst(): Promise<string> {
+  const drafts = (await listMarkdown())
+    .filter((f) => f.rel.startsWith("drafts/") && !f.rel.includes("/contracts/"))
+    .sort((a, b) => draftSortKey(a.rel, a.text) - draftSortKey(b.rel, b.text));
+
+  if (!drafts.length) throw new Error("No draft chapters to export.");
+
+  const studio = await loadStudioConfig();
+  const title = studio.title || "Manuscript";
+
+  const chapters = drafts.map((d) => {
+    const name = d.rel.replace(/^drafts\//, "").replace(/\.md$/, "");
+    const body = stripForCompile(d.text)
+      .split(/\n{2,}/)
+      .map((p) => escapeTypst(p.trim()))
+      .filter(Boolean)
+      .join("\n\n");
+    return `= ${escapeTypst(name)}\n\n${body}`;
+  });
+
+  const typst = `#set document(title: "${escapeTypst(title)}")
+#set page(margin: 1in)
+#set text(font: "Linux Libertine", size: 11pt)
+#set par(justify: true, leading: 0.65em)
+
+#align(center)[
+  #text(1.8em, weight: "bold")[${escapeTypst(title)}]
+]
+
+#pagebreak()
+
+${chapters.join("\n\n#pagebreak()\n\n")}
+`;
+
+  return writeWorkspaceFile("compile/manuscript.typ", typst);
+}

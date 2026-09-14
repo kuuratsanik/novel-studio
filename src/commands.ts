@@ -17,6 +17,8 @@ import {
 import { automationSettings, probeLocalEngine } from "./services/automation";
 import { ensureSceneContract } from "./services/autoContract";
 import { beginGeneration, cancelGeneration, endGeneration, isGenerating } from "./services/generationQueue";
+import { isUnrestrictedOnly, applyUnrestrictedPreset, blockCloud } from "./services/unrestrictedMode";
+import { speakLocal } from "./services/localTts";
 
 export function selection(): string {
   const ed = vscode.window.activeTextEditor;
@@ -45,6 +47,18 @@ export async function pickRoute(
   task: ModelTask = "writer",
 ): Promise<{ provider: string; model: string; localUrl: string }> {
   const cfg = vscode.workspace.getConfiguration("novelStudio");
+  if (isUnrestrictedOnly()) {
+    const localUrl = cfg.get<string>("localTextUrl") || "http://127.0.0.1:11434";
+    const fastModel = cfg.get<string>("fastModel") || "qwen2.5:7b-instruct";
+    const writerModel = cfg.get<string>("writerModel") || "qwen2.5:32b-instruct";
+    const forced = cfg.get<string>("defaultProvider") || "ollama";
+    const provider = forced === "kobold" ? "kobold" : "ollama";
+    return {
+      provider,
+      model: resolveModelForTask(provider, task, fastModel, writerModel),
+      localUrl,
+    };
+  }
   const offline = cfg.get<boolean>("offlineFirst") ?? false;
   const forced = cfg.get<string>("defaultProvider") || "";
   const defaultModel = cfg.get<string>("defaultModel") || "";
@@ -91,6 +105,25 @@ export function cancelGenerationCmd(): void {
   }
   cancelGeneration();
   vscode.window.showInformationMessage("Generation cancelled.");
+}
+
+export async function applyUnrestrictedPresetCmd(): Promise<void> {
+  const keys = await applyUnrestrictedPreset();
+  vscode.window.showInformationMessage(`Unrestricted preset applied (${keys.length} settings). Use Ollama locally.`);
+}
+
+export async function narrateWithFallback(audio: AudioService, src: string): Promise<string> {
+  const cfg = vscode.workspace.getConfiguration("novelStudio");
+  const localFirst = cfg.get<boolean>("localTtsFirst") ?? true;
+  if (localFirst || isUnrestrictedOnly()) {
+    const rel = await speakLocal(src.slice(0, 4000));
+    if (rel) return rel;
+    if (isUnrestrictedOnly()) {
+      throw new Error("Local TTS unavailable. Install piper, espeak, or pico2wave.");
+    }
+  }
+  blockCloud();
+  return audio.speak(src.slice(0, 4000), "openai");
 }
 
 export async function generatePacked(
@@ -268,8 +301,25 @@ export async function exportLora() {
 
 export async function batchAudiobook(audio: AudioService) {
   const src = selection() || activeText();
-  const rel = await audio.speak(src.slice(0, 4000), "openai");
+  const rel = await narrateWithFallback(audio, src);
   insert(`[narration](${rel})`);
+}
+
+export async function grammarLintCmd() {
+  const { writeGrammarReport } = await import("./services/grammarLint");
+  const dest = await writeGrammarReport();
+  vscode.window.showInformationMessage(`Grammar lint: ${dest}`);
+}
+
+export async function exportTypstCmd() {
+  const { exportTypst } = await import("./services/compiler");
+  const rel = await exportTypst();
+  vscode.window.showInformationMessage(`Typst export: ${rel}`);
+}
+
+export async function chapterTimelineCmd() {
+  const { openChapterTimeline } = await import("./services/chapterTimeline");
+  await openChapterTimeline();
 }
 
 export async function pickPromptAndRun(text: TextRouter, keys: KeyManager) {
