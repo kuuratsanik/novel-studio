@@ -106,7 +106,7 @@ async function crossChapterFlags(prose: string, currentRel?: string): Promise<Co
   return flags;
 }
 
-export async function auditProse(prose: string): Promise<ContinuityFlag[]> {
+export async function auditProse(prose: string, draftRel?: string): Promise<ContinuityFlag[]> {
   const flags: ContinuityFlag[] = [];
   const studio = await loadStudioConfig();
 
@@ -158,7 +158,7 @@ export async function auditProse(prose: string): Promise<ContinuityFlag[]> {
     }
   }
 
-  const rel = currentDraftRel();
+  const rel = draftRel || currentDraftRel();
   if (rel) {
     const loaded = await loadContract(rel);
     if (loaded) {

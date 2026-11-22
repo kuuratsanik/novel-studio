@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.1
+
+- **Audit all drafts** command: continuity per chapter (correct `drafts/*.md` rel), grammar lint, broken links → `compile/audit-all.md`.
+- Problems panel diagnostics published for every draft file.
+- Save/full orchestrator runs the full audit-all report (not flag count only).
+- `auditProse` accepts optional chapter path so orchestrator and batch audits are accurate.
+
 ## 2.2.0
 
 - **Unrestricted-only mode** (`novelStudio.unrestrictedOnly`) blocks cloud providers; one-click preset in Autopilot tab.

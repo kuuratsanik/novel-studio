@@ -104,6 +104,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
               snapshot: "novelStudio.compareSnapshot",
               publish: "novelStudio.publishPackage",
               audit: "novelStudio.auditContinuity",
+              auditAll: "novelStudio.auditAll",
               writeScene: "novelStudio.writeScene",
               grammar: "novelStudio.grammarLint",
               timeline: "novelStudio.chapterTimeline",
@@ -475,6 +476,7 @@ export class NovelStudioProvider implements vscode.WebviewViewProvider {
       <button data-action="embeddings">Rebuild embeddings</button>
       <button data-action="snapshot">Compare snapshot</button>
       <button data-action="audit">Continuity audit</button>
+      <button data-action="auditAll">Audit all drafts</button>
       <button data-action="writeScene">Scene pipeline</button>
       <button data-action="pdf">Export PDF</button>
       <button data-action="typst">Export Typst</button>

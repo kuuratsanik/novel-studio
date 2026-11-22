@@ -209,16 +209,13 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
     {
       id: "audit-all",
       label: "Audit all drafts",
-      profiles: ["full"],
+      profiles: ["save", "full"],
       run: async () => {
-        const drafts = (await listMarkdown()).filter(
-          (f) => f.rel.startsWith("drafts/") && !f.rel.includes("/contracts/"),
-        );
-        let flags = 0;
-        for (const d of drafts) {
-          flags += (await auditProse(d.text)).length;
-        }
-        return `${flags} flag(s) across ${drafts.length} draft(s)`;
+        const { writeAuditAllReport, auditAllDrafts } = await import("./auditAll");
+        const dest = await writeAuditAllReport();
+        const drafts = await auditAllDrafts();
+        const flags = drafts.reduce((n, f) => n + f.flags.length, 0);
+        return `${flags} flag(s) across ${drafts.length} draft(s) → ${dest}`;
       },
     },
     {

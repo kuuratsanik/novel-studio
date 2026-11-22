@@ -101,6 +101,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.diffRewrite", wrap(() => cmds.diffRewrite(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.multiAgent", wrap(() => cmds.multiAgent(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.auditContinuity", wrap(() => cmds.runAudit(diagnostics))),
+    vscode.commands.registerCommand("novelStudio.auditAll", wrap(() => cmds.auditAllCmd(diagnostics))),
     vscode.commands.registerCommand("novelStudio.compileManuscript", wrap(() => cmds.compileAll())),
     vscode.commands.registerCommand("novelStudio.exportHtml", wrap(() => cmds.exportHtmlCmd())),
     vscode.commands.registerCommand("novelStudio.exportPdf", wrap(() => cmds.exportPdfCmd())),

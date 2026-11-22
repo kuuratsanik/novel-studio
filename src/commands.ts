@@ -277,6 +277,13 @@ export async function runAudit(diagnostics: ContinuityDiagnostics) {
   vscode.window.showInformationMessage(`Continuity flags: ${n}`);
 }
 
+export async function auditAllCmd(diagnostics: ContinuityDiagnostics) {
+  const { writeAuditAllReport } = await import("./services/auditAll");
+  const rel = await writeAuditAllReport();
+  const total = await diagnostics.runOnAllDrafts();
+  vscode.window.showInformationMessage(`Audit all: ${total} flag(s). Report → ${rel}`);
+}
+
 export async function compileAll() {
   const { compileManuscript } = await import("./services/compiler");
   vscode.window.showInformationMessage((await compileManuscript()).join(", "));
