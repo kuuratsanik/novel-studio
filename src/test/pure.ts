@@ -7,6 +7,7 @@ import { draftSortKey, parseFrontmatter } from "../services/frontmatter";
 import { epubCss } from "../services/epubThemes";
 import { markdownToHtmlBlocks } from "../services/markdownHtml";
 import { voicePromptForSpeakers } from "../services/voicePrompt";
+import { findBrokenWikiLinksInFiles, wikiDefinitionsFromFiles } from "../services/wikiUtil";
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -54,6 +55,17 @@ export function runPureTests(): void {
 
   const parsed = parseJsonLoose<{ goal: string }>('{"goal":"test"}');
   assert(parsed?.goal === "test", "json loose");
+
+  const wikiFiles = [
+    { rel: "codex/characters.md", text: "# Characters\n\n## Iskra\n\nDock runner.\n" },
+    { rel: "drafts/ch01.md", text: "[[Iskra]] met [[Ghost]] at the pier.\n" },
+  ];
+  const defined = wikiDefinitionsFromFiles(wikiFiles);
+  assert(defined.has("iskra"), "heading defines Iskra");
+  assert(!defined.has("ghost"), "mention alone does not define Ghost");
+  const broken = findBrokenWikiLinksInFiles(wikiFiles);
+  assert(broken.some((b) => b.link === "Ghost"), "Ghost is broken");
+  assert(!broken.some((b) => b.link === "Iskra"), "Iskra is defined");
 }
 
 if (require.main === module) {

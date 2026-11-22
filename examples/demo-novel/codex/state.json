@@ -1,0 +1,13 @@
+{
+  "updated": "2026-11-22T00:00:00.000Z",
+  "characters": [
+    {
+      "name": "Iskra",
+      "location": "harbor docks",
+      "status": "alive",
+      "inventory": ["sealed packet"],
+      "relationships": {},
+      "facts": ["afraid of open water", "dock runner"]
+    }
+  ]
+}

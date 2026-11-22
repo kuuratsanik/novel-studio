@@ -1,0 +1,8 @@
+{
+  "goal": "Iskra delivers a sealed packet before first light without wetting her boots.",
+  "conflict": "The docks are watched and the water is rising with the tide.",
+  "turn": "She slips past the sleeping watchman with the packet still sealed.",
+  "exit": "She enters the alley toward the warehouse lights.",
+  "mustInclude": ["packet", "harbor"],
+  "mustNot": ["suddenly", "realized"]
+}

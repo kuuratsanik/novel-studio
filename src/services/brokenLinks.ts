@@ -1,20 +1,9 @@
-import { buildWikiIndex } from "./wikiIndex";
 import { listMarkdown } from "./workspaceIo";
+import { findBrokenWikiLinksInFiles } from "./wikiUtil";
 
 export async function findBrokenWikiLinks(): Promise<{ file: string; link: string }[]> {
-  const { entries } = await buildWikiIndex();
-  const known = new Set(entries.map((e) => e.title.toLowerCase()));
-  const broken: { file: string; link: string }[] = [];
-
-  for (const file of await listMarkdown()) {
-    for (const m of file.text.matchAll(/\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]/g)) {
-      const title = m[1].trim();
-      if (!known.has(title.toLowerCase())) {
-        broken.push({ file: file.rel, link: title });
-      }
-    }
-  }
-  return broken;
+  const files = await listMarkdown();
+  return findBrokenWikiLinksInFiles(files);
 }
 
 export async function writeBrokenLinkReport(): Promise<string> {

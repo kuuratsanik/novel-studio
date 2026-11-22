@@ -6,12 +6,21 @@ export interface LtMatch {
   length: number;
 }
 
-export async function lintWithLanguageTool(text: string): Promise<LtMatch[]> {
-  const url =
+function checkUrl(): string {
+  return (
     vscode.workspace.getConfiguration("novelStudio").get<string>("languageToolUrl") ||
-    "http://127.0.0.1:8081/v2/check";
+    "http://127.0.0.1:8081/v2/check"
+  );
+}
+
+function languagesUrl(): string {
+  const check = checkUrl();
+  return check.replace(/\/v2\/check\/?$/, "/v2/languages");
+}
+
+export async function lintWithLanguageTool(text: string): Promise<LtMatch[]> {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(checkUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ text, language: "en-US" }),
@@ -26,11 +35,8 @@ export async function lintWithLanguageTool(text: string): Promise<LtMatch[]> {
 }
 
 export async function probeLanguageTool(): Promise<boolean> {
-  const url =
-    vscode.workspace.getConfiguration("novelStudio").get<string>("languageToolUrl") ||
-    "http://127.0.0.1:8081/v2/languages";
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(languagesUrl(), { signal: AbortSignal.timeout(3000) });
     return res.ok;
   } catch {
     return false;

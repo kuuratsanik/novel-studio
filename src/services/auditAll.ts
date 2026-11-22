@@ -5,6 +5,7 @@ import { lintWorkspaceGrammar, writeGrammarReport } from "./grammarLint";
 import { findBrokenWikiLinks, writeBrokenLinkReport } from "./brokenLinks";
 import { contractReady, loadContract } from "./contracts";
 import { loadManuscriptGraph } from "./manuscriptGraph";
+import { saveManuscriptGraph } from "./manuscriptGraph";
 
 export interface FileAudit {
   rel: string;
@@ -42,9 +43,12 @@ export async function auditAllDrafts(): Promise<FileAudit[]> {
 }
 
 export async function writeAuditAllReport(): Promise<AuditAllSummary> {
+  // Ensure graph exists for orphan detection
+  await saveManuscriptGraph().catch(() => undefined);
+
   const fileAudits = await auditAllDrafts();
-  await writeGrammarReport();
   const grammar = await lintWorkspaceGrammar();
+  await writeGrammarReport(grammar);
   const broken = await findBrokenWikiLinks();
   await writeBrokenLinkReport();
 
@@ -121,6 +125,15 @@ export async function writeAuditAllReport(): Promise<AuditAllSummary> {
       lines.push(`- ${b.file}: [[${b.link}]]`);
     }
     if (broken.length > 40) lines.push(`\n… and ${broken.length - 40} more`);
+    lines.push("");
+  }
+
+  if (grammar.length) {
+    lines.push("## Grammar & style (sample)", "");
+    for (const g of grammar.slice(0, 40)) {
+      lines.push(`- ${g.file}:${g.line} — ${g.message}`);
+    }
+    if (grammar.length > 40) lines.push(`\n… and ${grammar.length - 40} more`);
     lines.push("");
   }
 

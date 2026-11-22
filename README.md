@@ -19,7 +19,7 @@ Repo: https://github.com/kuuratsanik/novel-studio
 
 Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity audit (active chapter), `Ctrl+Alt+Shift+A` audit all drafts, `Ctrl+Alt+D` diff rewrite, `Ctrl+Alt+S` snapshot.
 
-**Audit all** writes `compile/audit-all.md` (continuity per chapter, grammar, broken links, contracts, orphan characters), refreshes the Problems panel for every draft, and opens the report.
+**Audit all** writes `compile/audit-all.md` (continuity per chapter, grammar, broken links, contracts, orphan characters), refreshes the Problems panel for every draft, and opens the report. Wiki `[[links]]` only resolve against file stems and headings — bare mentions no longer count as definitions.
 
 ## Automatic mode (default)
 

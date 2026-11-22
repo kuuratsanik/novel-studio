@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.3
+
+- **Fix broken wiki-link audit**: definitions are file stems + headings only; `[[mentions]]` no longer self-register as valid targets.
+- Grammar lint skips frontmatter, blank lines, quotes, and code; LanguageTool re-wired when enabled; no double LT diagnostics.
+- Audit all rebuilds manuscript graph first, reuses one grammar pass, includes grammar sample in report.
+- LanguageTool probe hits `/v2/languages` even when setting points at `/v2/check`.
+- Demo novel fixture: longer chapter, scene contract, state.json, world lore — passes wiki/contract CI audit.
+- Pure tests cover wiki definition vs broken-link detection.
+
 ## 2.2.2
 
 - **Audit all follow-up**: progress notification, opens `compile/audit-all.md` beside the editor.
