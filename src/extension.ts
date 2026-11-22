@@ -6,6 +6,7 @@ import { TextRouter } from "./services/textProviders";
 import { AudioService } from "./services/audioService";
 import { HeadingCodeLens } from "./services/headingCodeLens";
 import { ContinuityDiagnostics } from "./services/diagnostics";
+import { GrammarDiagnostics } from "./services/grammarDiagnostics";
 import * as cmds from "./commands";
 import { StudioStatusBar } from "./services/statusBar";
 import { automationSettings, ensureWorkspaceReady, warmWorkspaceState } from "./services/automation";
@@ -32,6 +33,7 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
 export function activate(context: vscode.ExtensionContext) {
   const keyManager = new KeyManager(context.secrets);
   const diagnostics = new ContinuityDiagnostics();
+  const grammarDiagnostics = new GrammarDiagnostics();
   const text = new TextRouter(keyManager, new NovelAiService(() => keyManager.getKey("novelai")));
   const provider = new NovelStudioProvider(context.extensionUri, {
     keys: keyManager,
@@ -54,6 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
     const auto = automationSettings();
     if (!auto.autoAuditOnSave) return;
     const n = await diagnostics.runOnEditor();
+    await grammarDiagnostics.runOnEditor();
     status.setFlags(n);
     await status.refresh();
   }, 1200);
@@ -68,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     diagnostics.disposable,
+    grammarDiagnostics.disposable,
     status.disposable,
     vscode.window.registerWebviewViewProvider(NovelStudioProvider.viewType, provider),
     vscode.languages.registerCodeLensProvider({ language: "markdown" }, lenses),
@@ -101,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("novelStudio.diffRewrite", wrap(() => cmds.diffRewrite(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.multiAgent", wrap(() => cmds.multiAgent(text, keyManager))),
     vscode.commands.registerCommand("novelStudio.auditContinuity", wrap(() => cmds.runAudit(diagnostics))),
-    vscode.commands.registerCommand("novelStudio.auditAll", wrap(() => cmds.auditAllCmd(diagnostics))),
+    vscode.commands.registerCommand("novelStudio.auditAll", wrap(() => cmds.auditAllCmd(diagnostics, grammarDiagnostics))),
     vscode.commands.registerCommand("novelStudio.compileManuscript", wrap(() => cmds.compileAll())),
     vscode.commands.registerCommand("novelStudio.exportHtml", wrap(() => cmds.exportHtmlCmd())),
     vscode.commands.registerCommand("novelStudio.exportPdf", wrap(() => cmds.exportPdfCmd())),

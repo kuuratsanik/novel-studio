@@ -277,11 +277,30 @@ export async function runAudit(diagnostics: ContinuityDiagnostics) {
   vscode.window.showInformationMessage(`Continuity flags: ${n}`);
 }
 
-export async function auditAllCmd(diagnostics: ContinuityDiagnostics) {
-  const { writeAuditAllReport } = await import("./services/auditAll");
-  const rel = await writeAuditAllReport();
-  const total = await diagnostics.runOnAllDrafts();
-  vscode.window.showInformationMessage(`Audit all: ${total} flag(s). Report → ${rel}`);
+export async function auditAllCmd(
+  diagnostics: ContinuityDiagnostics,
+  grammar?: import("./services/grammarDiagnostics").GrammarDiagnostics,
+) {
+  const summary = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Novel Studio: Audit all drafts",
+      cancellable: false,
+    },
+    async (progress) => {
+      progress.report({ message: "Continuity + grammar + links…" });
+      const { writeAuditAllReport, openAuditAllReport } = await import("./services/auditAll");
+      const result = await writeAuditAllReport();
+      progress.report({ message: "Publishing Problems panel…" });
+      await diagnostics.runOnAllDrafts();
+      await grammar?.runOnAllDrafts();
+      await openAuditAllReport();
+      return result;
+    },
+  );
+  vscode.window.showInformationMessage(
+    `Audit all: ${summary.continuityFlags} continuity · ${summary.grammarFlags} grammar · ${summary.brokenLinks} broken links · ${summary.contractsReady}/${summary.chapters} contracts → ${summary.reportPath}`,
+  );
 }
 
 export async function compileAll() {

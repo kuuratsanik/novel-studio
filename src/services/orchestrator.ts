@@ -211,11 +211,9 @@ function buildTasks(diagnostics?: ContinuityDiagnostics): TaskDef[] {
       label: "Audit all drafts",
       profiles: ["save", "full"],
       run: async () => {
-        const { writeAuditAllReport, auditAllDrafts } = await import("./auditAll");
-        const dest = await writeAuditAllReport();
-        const drafts = await auditAllDrafts();
-        const flags = drafts.reduce((n, f) => n + f.flags.length, 0);
-        return `${flags} flag(s) across ${drafts.length} draft(s) → ${dest}`;
+        const { writeAuditAllReport } = await import("./auditAll");
+        const s = await writeAuditAllReport();
+        return `${s.continuityFlags} continuity · ${s.grammarFlags} grammar · ${s.brokenLinks} links · ${s.contractsReady}/${s.chapters} contracts → ${s.reportPath}`;
       },
     },
     {

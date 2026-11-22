@@ -2,7 +2,7 @@
   "name": "novel-studio",
   "displayName": "Novel Studio",
   "description": "Write novels in VS Code: multi-engine generation, series bible, scene contracts, continuity audit, and manuscript compile.",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "publisher": "kuuratsanik",
   "license": "MIT",
   "galleryBanner": {
@@ -192,6 +192,16 @@
           "type": "string",
           "default": "http://127.0.0.1:8081/v2/check",
           "description": "LanguageTool HTTP API endpoint for optional grammar checks."
+        },
+        "novelStudio.grammarDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show grammar/style issues in the Problems panel while editing and during Audit All."
+        },
+        "novelStudio.languageToolLint": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include LanguageTool results in grammar lint and diagnostics when a local server is available."
         }
       }
     },
@@ -207,6 +217,11 @@
         "key": "ctrl+alt+a",
         "mac": "cmd+alt+a",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "novelStudio.auditAll",
+        "key": "ctrl+alt+shift+a",
+        "mac": "cmd+alt+shift+a"
       },
       {
         "command": "novelStudio.diffRewrite",

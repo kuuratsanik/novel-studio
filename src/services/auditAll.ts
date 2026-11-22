@@ -1,12 +1,28 @@
-import { listMarkdown, writeWorkspaceFile } from "./workspaceIo";
+import * as vscode from "vscode";
+import { listMarkdown, uriFor, writeWorkspaceFile } from "./workspaceIo";
 import { auditProse, ContinuityFlag } from "./continuity";
 import { lintWorkspaceGrammar, writeGrammarReport } from "./grammarLint";
-import { writeBrokenLinkReport } from "./brokenLinks";
+import { findBrokenWikiLinks, writeBrokenLinkReport } from "./brokenLinks";
 import { contractReady, loadContract } from "./contracts";
+import { loadManuscriptGraph } from "./manuscriptGraph";
 
 export interface FileAudit {
   rel: string;
   flags: ContinuityFlag[];
+  contractReady: boolean;
+}
+
+export interface AuditAllSummary {
+  chapters: number;
+  continuityFlags: number;
+  warnings: number;
+  info: number;
+  grammarFlags: number;
+  brokenLinks: number;
+  contractsReady: number;
+  orphanCharacters: string[];
+  worstChapters: { rel: string; count: number }[];
+  reportPath: string;
 }
 
 export async function auditAllDrafts(): Promise<FileAudit[]> {
@@ -15,30 +31,42 @@ export async function auditAllDrafts(): Promise<FileAudit[]> {
   );
   const results: FileAudit[] = [];
   for (const d of drafts) {
-    results.push({ rel: d.rel, flags: await auditProse(d.text, d.rel) });
+    const loaded = await loadContract(d.rel);
+    results.push({
+      rel: d.rel,
+      flags: await auditProse(d.text, d.rel),
+      contractReady: !!(loaded && contractReady(loaded.contract)),
+    });
   }
   return results;
 }
 
-export async function writeAuditAllReport(): Promise<string> {
+export async function writeAuditAllReport(): Promise<AuditAllSummary> {
   const fileAudits = await auditAllDrafts();
   await writeGrammarReport();
   const grammar = await lintWorkspaceGrammar();
+  const broken = await findBrokenWikiLinks();
+  await writeBrokenLinkReport();
 
-  let broken = "compile/broken-links.md";
-  try {
-    broken = await writeBrokenLinkReport();
-  } catch {
-    // workspace not ready
+  const graph = await loadManuscriptGraph();
+  const orphanCharacters: string[] = [];
+  if (graph) {
+    for (const e of graph.entities.filter((x) => x.kind === "character")) {
+      const appears = graph.edges.some((edge) => edge.from === e.id && edge.rel === "appears-in");
+      if (!appears) orphanCharacters.push(e.name);
+    }
   }
 
-  let contractsReady = 0;
-  for (const { rel } of fileAudits) {
-    const loaded = await loadContract(rel);
-    if (loaded && contractReady(loaded.contract)) contractsReady++;
-  }
+  const warnings = fileAudits.reduce((n, f) => n + f.flags.filter((x) => x.severity === "warning").length, 0);
+  const info = fileAudits.reduce((n, f) => n + f.flags.filter((x) => x.severity === "information").length, 0);
+  const totalFlags = warnings + info;
+  const contractsReady = fileAudits.filter((f) => f.contractReady).length;
+  const worstChapters = [...fileAudits]
+    .sort((a, b) => b.flags.length - a.flags.length)
+    .slice(0, 5)
+    .filter((f) => f.flags.length > 0)
+    .map((f) => ({ rel: f.rel, count: f.flags.length }));
 
-  const totalFlags = fileAudits.reduce((n, f) => n + f.flags.length, 0);
   const lines = [
     "# Audit all — workspace",
     "",
@@ -47,18 +75,35 @@ export async function writeAuditAllReport(): Promise<string> {
     "| Check | Result |",
     "|---|---|",
     `| Draft chapters | ${fileAudits.length} |`,
-    `| Continuity flags | ${totalFlags} |`,
+    `| Continuity flags | ${totalFlags} (${warnings} warning / ${info} info) |`,
     `| Grammar/style flags | ${grammar.length} |`,
+    `| Broken wiki links | ${broken.length} |`,
     `| Contracts ready | ${contractsReady}/${fileAudits.length} |`,
-    `| Broken links | ${broken} |`,
+    `| Orphan characters | ${orphanCharacters.length} |`,
+    `| Broken links report | compile/broken-links.md |`,
     `| Grammar report | compile/grammar-lint.md |`,
-    "",
-    "## Continuity by chapter",
     "",
   ];
 
+  if (worstChapters.length) {
+    lines.push("## Highest-flag chapters", "");
+    for (const w of worstChapters) {
+      lines.push(`- ${w.rel}: ${w.count} flag(s)`);
+    }
+    lines.push("");
+  }
+
+  if (orphanCharacters.length) {
+    lines.push("## Orphan characters (in state/codex, never appear in a chapter)", "");
+    for (const n of orphanCharacters) lines.push(`- ${n}`);
+    lines.push("");
+  }
+
+  lines.push("## Continuity by chapter", "");
+
   for (const f of fileAudits) {
-    lines.push(`### ${f.rel} (${f.flags.length} flag(s))`, "");
+    const ready = f.contractReady ? "contract✓" : "contract✗";
+    lines.push(`### ${f.rel} (${f.flags.length} flag(s), ${ready})`, "");
     if (!f.flags.length) {
       lines.push("_No flags._", "");
       continue;
@@ -70,5 +115,31 @@ export async function writeAuditAllReport(): Promise<string> {
     lines.push("");
   }
 
-  return writeWorkspaceFile("compile/audit-all.md", lines.join("\n") + "\n");
+  if (broken.length) {
+    lines.push("## Broken wiki links (sample)", "");
+    for (const b of broken.slice(0, 40)) {
+      lines.push(`- ${b.file}: [[${b.link}]]`);
+    }
+    if (broken.length > 40) lines.push(`\n… and ${broken.length - 40} more`);
+    lines.push("");
+  }
+
+  const reportPath = await writeWorkspaceFile("compile/audit-all.md", lines.join("\n") + "\n");
+  return {
+    chapters: fileAudits.length,
+    continuityFlags: totalFlags,
+    warnings,
+    info,
+    grammarFlags: grammar.length,
+    brokenLinks: broken.length,
+    contractsReady,
+    orphanCharacters,
+    worstChapters,
+    reportPath,
+  };
+}
+
+export async function openAuditAllReport(): Promise<void> {
+  const doc = await vscode.workspace.openTextDocument(uriFor("compile/audit-all.md"));
+  await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside });
 }

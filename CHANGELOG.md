@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.2
+
+- **Audit all follow-up**: progress notification, opens `compile/audit-all.md` beside the editor.
+- Richer summary: warning/info split, worst chapters, orphan characters, broken wiki link sample, contract readiness per chapter.
+- **Grammar diagnostics** for all drafts during Audit All (`novelStudio.grammarDiagnostics`, optional LanguageTool).
+- Shortcut: `Ctrl+Alt+Shift+A` / `Cmd+Alt+Shift+A` runs Audit All.
+- Integration tests assert `auditAll` / `auditContinuity` commands are registered.
+
 ## 2.2.1
 
 - **Audit all drafts** command: continuity per chapter (correct `drafts/*.md` rel), grammar lint, broken links → `compile/audit-all.md`.

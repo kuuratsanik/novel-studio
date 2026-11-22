@@ -10,4 +10,6 @@ export async function run(): Promise<void> {
   const commands = await vscode.commands.getCommands(true);
   assert.ok(commands.includes("novelStudio.continueScene"), "continueScene command registered");
   assert.ok(commands.includes("novelStudio.exportEpub"), "exportEpub command registered");
+  assert.ok(commands.includes("novelStudio.auditAll"), "auditAll command registered");
+  assert.ok(commands.includes("novelStudio.auditContinuity"), "auditContinuity command registered");
 }

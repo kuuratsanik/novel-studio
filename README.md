@@ -17,7 +17,9 @@ Repo: https://github.com/kuuratsanik/novel-studio
 5. Command Palette → **Novel Studio: New Novel Workspace** → open the folder it creates.
 6. Command Palette → **Novel Studio: Set API Key** for OpenRouter / NovelAI / OpenAI (or leave empty and use local Ollama).
 
-Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity audit, `Ctrl+Alt+D` diff rewrite, `Ctrl+Alt+S` snapshot.
+Shortcuts after install: `Ctrl+Alt+N` continue scene, `Ctrl+Alt+A` continuity audit (active chapter), `Ctrl+Alt+Shift+A` audit all drafts, `Ctrl+Alt+D` diff rewrite, `Ctrl+Alt+S` snapshot.
+
+**Audit all** writes `compile/audit-all.md` (continuity per chapter, grammar, broken links, contracts, orphan characters), refreshes the Problems panel for every draft, and opens the report.
 
 ## Automatic mode (default)
 
